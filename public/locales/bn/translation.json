@@ -1,0 +1,70 @@
+{
+  "app": {
+    "title": "ওকে ফুটওয়্যার ইআরপি",
+    "loading": "লোড হচ্ছে…"
+  },
+  "nav": {
+    "dashboard": "ড্যাশবোর্ড",
+    "orders": "অর্ডার",
+    "procurement": "সংগ্রহ",
+    "hr": "মানবসম্পদ",
+    "finance": "অর্থায়ন",
+    "board": "বোর্ড মিটিং",
+    "system": "সিস্টেম সেটিংস",
+    "logout": "লগআউট"
+  },
+  "auth": {
+    "email": "ইমেইল",
+    "password": "পাসওয়ার্ড",
+    "signIn": "সাইন ইন",
+    "signOut": "সাইন আউট",
+    "accessDenied": "অনুমতি নেই",
+    "pageNotFound": "পৃষ্ঠা পাওয়া যায়নি",
+    "goToDashboard": "ড্যাশবোর্ডে যান"
+  },
+  "dashboard": {
+    "welcome": "স্বাগতম, {{name}}। আপনার {{count}} টি অনুমতি আছে।",
+    "welcome_other": "স্বাগতম, {{name}}। আপনার {{count}} টি অনুমতি আছে।",
+    "title": "ড্যাশবোর্ড"
+  },
+  "common": {
+    "save": "সংরক্ষণ",
+    "cancel": "বাতিল",
+    "delete": "মুছুন",
+    "edit": "সম্পাদনা",
+    "create": "তৈরি করুন",
+    "search": "অনুসন্ধান",
+    "noResults": "কোনো ফলাফল পাওয়া যায়নি।",
+    "confirm": "নিশ্চিত করুন",
+    "close": "বন্ধ করুন",
+    "back": "পিছনে",
+    "next": "পরবর্তী",
+    "language": "ভাষা",
+    "english": "English",
+    "bengali": "বাংলা",
+    "notification": "বিজ্ঞপ্তি",
+    "notifications": "বিজ্ঞপ্তিসমূহ",
+    "showToast": "টোস্ট দেখান",
+    "openDialog": "ডায়ালগ খুলুন",
+    "openSheet": "শীট খুলুন",
+    "dialogTitle": "ডায়ালগ শিরোনাম",
+    "dialogDescription": "এটি একটি shadcn/ui ডায়ালগ উপাদান।",
+    "sheetTitle": "শীট শিরোনাম",
+    "sheetDescription": "এটি একটি shadcn/ui শীট উপাদান।",
+    "tabOne": "ট্যাব এক",
+    "tabTwo": "ট্যাব দুই",
+    "tabOneContent": "ট্যাব একের বিষয়বস্তু।",
+    "tabTwoContent": "ট্যাব দুইয়ের বিষয়বস্তু।",
+    "toastMessage": "বিজ্ঞপ্তি পাঠানো হয়েছে",
+    "toastDescription": "সোনার টোস্ট কাজ করছে।",
+    "moduleComing": "{{module}} মডিউল {{sprint}} এ আসছে।"
+  },
+  "button": {
+    "default": "ডিফল্ট",
+    "destructive": "ধ্বংসাত্মক",
+    "outline": "আউটলাইন",
+    "secondary": "মাধ্যমিক",
+    "ghost": "গোস্ট",
+    "link": "লিংক"
+  }
+}

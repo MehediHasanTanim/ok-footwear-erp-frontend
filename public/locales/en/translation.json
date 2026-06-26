@@ -1,0 +1,70 @@
+{
+  "app": {
+    "title": "OK Footwear ERP",
+    "loading": "Loading…"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "orders": "Orders",
+    "procurement": "Procurement",
+    "hr": "Human Resources",
+    "finance": "Finance",
+    "board": "Board Meeting",
+    "system": "System Settings",
+    "logout": "Logout"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "accessDenied": "Access Denied",
+    "pageNotFound": "Page Not Found",
+    "goToDashboard": "Go to Dashboard"
+  },
+  "dashboard": {
+    "welcome": "Welcome, {{name}}. You have {{count}} permission.",
+    "welcome_other": "Welcome, {{name}}. You have {{count}} permissions.",
+    "title": "Dashboard"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "noResults": "No results found.",
+    "confirm": "Confirm",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "language": "Language",
+    "english": "English",
+    "bengali": "বাংলা",
+    "notification": "Notification",
+    "notifications": "Notifications",
+    "showToast": "Show Toast",
+    "openDialog": "Open Dialog",
+    "openSheet": "Open Sheet",
+    "dialogTitle": "Dialog Title",
+    "dialogDescription": "This is a shadcn/ui dialog component.",
+    "sheetTitle": "Sheet Title",
+    "sheetDescription": "This is a shadcn/ui sheet component.",
+    "tabOne": "Tab One",
+    "tabTwo": "Tab Two",
+    "tabOneContent": "Content for Tab One.",
+    "tabTwoContent": "Content for Tab Two.",
+    "toastMessage": "Notification sent",
+    "toastDescription": "Sonner toast is working.",
+    "moduleComing": "{{module}} module coming in {{sprint}}."
+  },
+  "button": {
+    "default": "Default",
+    "destructive": "Destructive",
+    "outline": "Outline",
+    "secondary": "Secondary",
+    "ghost": "Ghost",
+    "link": "Link"
+  }
+}
