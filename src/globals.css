@@ -27,6 +27,18 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+
+    /* ── Semantic status colors (used by compliance/audit badges) ── */
+    --bg-danger: 254 226 226; /* red-100 */
+    --text-danger: 153 27 27; /* red-800 */
+    --bg-warning: 254 243 199; /* amber-100 */
+    --text-warning: 146 64 14; /* amber-800 */
+    --bg-success: 220 252 231; /* green-100 */
+    --text-success: 22 101 52; /* green-800 */
+    --bg-teal: 204 251 241; /* teal-100 */
+    --text-teal: 17 94 89; /* teal-800 */
+    --bg-gray: 243 244 246; /* gray-100 */
+    --text-gray: 55 65 81; /* gray-700 */
   }
 
   .dark {
@@ -49,6 +61,18 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    /* ── Semantic status colors (dark mode variants) ── */
+    --bg-danger: 69 10 10; /* red-950 */
+    --text-danger: 252 165 165; /* red-300 */
+    --bg-warning: 69 26 3; /* amber-950 */
+    --text-warning: 253 230 138; /* amber-300 */
+    --bg-success: 5 46 22; /* green-950 */
+    --text-success: 134 239 172; /* green-300 */
+    --bg-teal: 4 47 46; /* teal-950 */
+    --text-teal: 94 234 212; /* teal-300 */
+    --bg-gray: 17 24 39; /* gray-900 */
+    --text-gray: 209 213 219; /* gray-300 */
   }
 }
 

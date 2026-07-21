@@ -3,13 +3,35 @@ import { persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 
 // ── Types ────────────────────────────────────────────────────────────────────
-export type Module = 'orders' | 'procurement' | 'hr' | 'finance' | 'board' | 'system' | 'dashboard'
+export type Module =
+  | 'orders'
+  | 'procurement'
+  | 'hr'
+  | 'finance'
+  | 'board'
+  | 'system'
+  | 'dashboard'
+  | 'compliance'
 
 export type Action = 'read' | 'create' | 'update' | 'delete'
 
 export interface Permission {
   module: Module | '*'
   action: Action | '*'
+}
+
+/**
+ * Convert backend string-format permissions ("orders:read") to Permission objects.
+ * The backend returns permissions as strings like "orders:read", "system:*", etc.
+ */
+export function parsePermissions(raw: string[]): Permission[] {
+  return raw.map((p) => {
+    const [module, action] = p.split(':') as [string, string]
+    return {
+      module: (module ?? '*') as Permission['module'],
+      action: (action ?? '*') as Permission['action'],
+    }
+  })
 }
 
 // ── Store shape ──────────────────────────────────────────────────────────────
@@ -58,19 +80,33 @@ function permissionMatches(perm: Permission, module: Module, action: Action): bo
   return false
 }
 
+/** Role names that grant unrestricted access regardless of permissions. */
+const SUPER_ADMIN_ROLES = ['super_admin', 'super admin']
+
+function isSuperAdmin(role: string | null): boolean {
+  if (!role) return false
+  const normalized = role.toLowerCase().replace(/[_\s]+/g, '_')
+  return SUPER_ADMIN_ROLES.some((r) => normalized === r.replace(/[_\s]+/g, '_'))
+}
+
 // ── Selectors (module-level, NOT on the store — avoids re-render storms) ────
+
+/** Modules that are always accessible (no backend permission check needed) */
+const PUBLIC_MODULES: Set<string> = new Set(['dashboard'])
 
 /**
  * Curried selector for permission checks with wildcard support.
  * Returns a boolean primitive — always stable when the value hasn't changed.
- *
- * Usage:
- *   const canReadOrders = useAuthStore(selectCan('orders', 'read'))
  */
 export const selectCan =
   (module: Module, action: Action) =>
-  (state: AuthState): boolean =>
-    state.permissions.some((p) => permissionMatches(p, module, action))
+  (state: AuthState): boolean => {
+    // Dashboard is a frontend-only concept — always accessible if authenticated
+    if (PUBLIC_MODULES.has(module)) return true
+    // Super Admin role name OR having a wildcard permission
+    if (isSuperAdmin(state.role)) return true
+    return (state.permissions ?? []).some((p) => permissionMatches(p, module, action))
+  }
 
 /**
  * Selector for the derived "is authenticated" state.
@@ -86,7 +122,7 @@ export const selectIsLoading = (state: AuthState): boolean => state.isLoading
 
 // ── Standalone helper (for non-React contexts like the API interceptor) ──────
 export function canAccess(permissions: Permission[], module: Module, action: Action): boolean {
-  return permissions.some((p) => permissionMatches(p, module, action))
+  return (permissions ?? []).some((p) => permissionMatches(p, module, action))
 }
 
 // ── Store ───────────────────────────────────────────────────────────────────
@@ -110,11 +146,6 @@ export const useAuthStore = create<AuthState>()(
           state.accessToken = payload.accessToken
           state.expiresAt = payload.expiresAt
           state.isLoading = false
-
-          // Notify SSE to connect — lazy import avoids circular dependency.
-          void import('./notifStore').then(({ useNotifStore }) => {
-            useNotifStore.getState().connect()
-          })
         }),
 
       setAccessToken: (token, expiresAt) =>
@@ -133,9 +164,9 @@ export const useAuthStore = create<AuthState>()(
           state.expiresAt = null
           state.isLoading = false
 
-          // Disconnect SSE and clear notifications.
+          // Clear notifications on logout
           void import('./notifStore').then(({ useNotifStore }) => {
-            useNotifStore.getState().disconnect()
+            useNotifStore.setState({ notifications: [], unreadCount: 0, sseConnected: false })
           })
         }),
 

@@ -11,6 +11,10 @@
     "finance": "Finance",
     "board": "Board Meeting",
     "system": "System Settings",
+    "users": "Users",
+    "roles": "Roles",
+    "auditLog": "Audit Log",
+    "compliance": "Compliance Register",
     "logout": "Logout"
   },
   "auth": {

@@ -1,0 +1,18 @@
+# ── Docker Compose for OK Footwear ERP Frontend ───────────────────────────────
+# Start:   docker compose up -d
+# Rebuild: docker compose up -d --build
+# Stop:    docker compose down
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Override this to point to your backend API.
+        # Vite bakes this into the JS bundle at build time — it is NOT a runtime env var.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:7100/api/v1}
+    container_name: ok-footwear-frontend
+    ports:
+      - '7173:7173'
+    restart: unless-stopped

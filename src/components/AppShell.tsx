@@ -4,10 +4,12 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  ClipboardCheck,
   Cpu,
   DollarSign,
   LayoutDashboard,
   Menu,
+  Shield,
   ShoppingCart,
   Users,
 } from 'lucide-react'
@@ -16,11 +18,12 @@ import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
+import { NotificationDropdown } from '@/components/layout/NotificationDropdown'
 import { Breadcrumb } from '@/components/nav/Breadcrumb'
-import { NotificationBell } from '@/components/nav/NotificationBell'
 import { UserDropdown } from '@/components/nav/UserDropdown'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { useNotifications } from '@/hooks/useNotifications'
 import { useUIStore } from '@/stores/uiStore'
 
 // ── Nav item config — grouped by category ────────────────────────────────────
@@ -69,6 +72,26 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/board', labelKey: 'nav.board', icon: <Building2 className="h-5 w-5" /> },
       { to: '/system', labelKey: 'nav.system', icon: <Cpu className="h-5 w-5" /> },
+      {
+        to: '/system/users',
+        labelKey: 'nav.users',
+        icon: <Users className="h-5 w-5" />,
+      },
+      {
+        to: '/system/roles',
+        labelKey: 'nav.roles',
+        icon: <Shield className="h-5 w-5" />,
+      },
+      {
+        to: '/system/audit',
+        labelKey: 'nav.auditLog',
+        icon: <ClipboardList className="h-5 w-5" />,
+      },
+      {
+        to: '/system/compliance',
+        labelKey: 'nav.compliance',
+        icon: <ClipboardCheck className="h-5 w-5" />,
+      },
     ],
   },
 ]
@@ -172,7 +195,7 @@ function Topbar() {
 
       {/* Right-side actions */}
       <div className="flex items-center gap-1">
-        <NotificationBell />
+        <NotificationDropdown />
         <UserDropdown />
       </div>
     </header>
@@ -198,6 +221,8 @@ function MobileMenuTrigger() {
 
 // ── AppShell ─────────────────────────────────────────────────────────────────
 export default function AppShell() {
+  useNotifications()
+
   return (
     <div className="flex min-h-screen">
       {/* Desktop sidebar — hidden on mobile (rendered as Sheet instead) */}

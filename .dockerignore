@@ -1,0 +1,38 @@
+# ── .dockerignore ─────────────────────────────────────────────────────────────
+# Exclude files not needed in the Docker build context.
+# Keeping the context small makes builds faster.
+
+node_modules
+dist
+coverage
+.git
+.gitignore
+.husky
+.vscode
+.venv
+
+# Build artifacts
+*.log
+npm-debug.log*
+
+# Test & e2e
+e2e/
+playwright-report/
+test-results/
+
+# Docs (not needed at runtime)
+docs/
+
+# Env files (VITE_API_URL is passed as a build arg, not copied)
+.env
+.env.local
+.env.*.local
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDE
+*.swp
+*.swo
+*~

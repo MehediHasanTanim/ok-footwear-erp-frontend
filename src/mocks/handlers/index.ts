@@ -1,7 +1,14 @@
 import { type HttpHandler } from 'msw'
 
+import { auditHandlers } from './audit.handlers'
 import { authHandlers } from './auth.handlers'
+import { complianceHandlers } from './compliance.handlers'
+import { usersHandlers } from './users.handlers'
 
 // Aggregate all domain handlers.
-// Each domain gets its own file (orders.handlers.ts, procurement.handlers.ts, etc.)
-export const handlers: HttpHandler[] = [...authHandlers]
+export const handlers: HttpHandler[] = [
+  ...authHandlers,
+  ...usersHandlers,
+  ...auditHandlers,
+  ...complianceHandlers,
+]

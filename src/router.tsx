@@ -2,6 +2,12 @@ import { lazy, Suspense, type ComponentType, type ReactNode } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 
 import { RoleGuard, type Action, type Module } from '@/lib/auth'
+// Direct import for UsersPage — bypasses lazyRoute+RoleGuard issue
+import AuditLogPage from '@/pages/system/AuditLogPage'
+import CompliancePage from '@/pages/system/CompliancePage'
+import ProfilePage from '@/pages/system/ProfilePage'
+import RolesPage from '@/pages/system/RolesPage'
+import UsersPage from '@/pages/system/UsersPage'
 
 // ── Skeleton fallback shared by all lazy routes ──────────────────────────────
 function PageSkeleton() {
@@ -37,7 +43,7 @@ function lazyRoute(
 }
 
 // ── Lazy page imports — every page is code-split ─────────────────────────────
-const LoginPage = () => lazyRoute(() => import('@/pages/LoginPage'))
+const LoginPage = () => lazyRoute(() => import('@/pages/auth/LoginPage'))
 
 const ForbiddenPage = () => lazyRoute(() => import('@/pages/ForbiddenPage'))
 
@@ -75,6 +81,10 @@ export const router = createBrowserRouter([
       {
         path: 'login',
         element: <LoginPage />,
+      },
+      {
+        path: 'auth/2fa',
+        element: lazyRoute(() => import('@/pages/auth/TwoFactorPage')),
       },
     ],
   },
@@ -132,9 +142,62 @@ export const router = createBrowserRouter([
         handle: { crumb: () => 'Board Meeting' },
       },
       {
+        path: 'profile',
+        element: (
+          <Suspense fallback={<PageSkeleton />}>
+            <ProfilePage />
+          </Suspense>
+        ),
+        handle: { crumb: () => 'Profile' },
+      },
+      {
         path: 'system',
         element: <SystemPage />,
         handle: { crumb: () => 'System Settings' },
+      },
+      {
+        path: 'system/users',
+        element: (
+          <RoleGuard module="system" action="read">
+            <Suspense fallback={<PageSkeleton />}>
+              <UsersPage />
+            </Suspense>
+          </RoleGuard>
+        ),
+        handle: { crumb: () => 'Users' },
+      },
+      {
+        path: 'system/roles',
+        element: (
+          <RoleGuard module="system" action="update">
+            <Suspense fallback={<PageSkeleton />}>
+              <RolesPage />
+            </Suspense>
+          </RoleGuard>
+        ),
+        handle: { crumb: () => 'Roles' },
+      },
+      {
+        path: 'system/audit',
+        element: (
+          <RoleGuard module="system" action="read">
+            <Suspense fallback={<PageSkeleton />}>
+              <AuditLogPage />
+            </Suspense>
+          </RoleGuard>
+        ),
+        handle: { crumb: () => 'Audit Log' },
+      },
+      {
+        path: 'system/compliance',
+        element: (
+          <RoleGuard module="compliance" action="read">
+            <Suspense fallback={<PageSkeleton />}>
+              <CompliancePage />
+            </Suspense>
+          </RoleGuard>
+        ),
+        handle: { crumb: () => 'Compliance' },
       },
     ],
   },
