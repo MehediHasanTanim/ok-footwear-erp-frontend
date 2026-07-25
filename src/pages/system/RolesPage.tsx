@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Loader2, Check, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Loader2, Check, Pencil, Trash2, Search } from 'lucide-react'
 import { useState, useCallback, useRef, useEffect } from 'react'
 
 import { PermissionMatrix } from '@/components/system/PermissionMatrix'
@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { useDebounce } from '@/hooks/useDebounce'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 
@@ -92,6 +93,8 @@ export default function RolesPage() {
   const [editRoleDesc, setEditRoleDesc] = useState('')
   const [deleteRoleOpen, setDeleteRoleOpen] = useState(false)
   const [deleteRoleId, setDeleteRoleId] = useState<string | null>(null)
+  const [roleSearch, setRoleSearch] = useState('')
+  const debouncedRoleSearch = useDebounce(roleSearch, 300)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Fetch roles ────────────────────────────────────────────────────────────
@@ -104,6 +107,13 @@ export default function RolesPage() {
   })
 
   const roles = rolesData ?? []
+  const filteredRoles = debouncedRoleSearch
+    ? roles.filter(
+        (r) =>
+          r.name.toLowerCase().includes(debouncedRoleSearch.toLowerCase()) ||
+          (r.description ?? '').toLowerCase().includes(debouncedRoleSearch.toLowerCase())
+      )
+    : roles
   const selectedRole = roles.find((r) => r.id === selectedRoleId) ?? null
 
   // ── Fetch detailed role with permissions when selected ─────────────────────
@@ -284,15 +294,27 @@ export default function RolesPage() {
         {/* ── Left panel: Role list ──────────────────────────────────────── */}
         <div className="w-56 shrink-0 rounded-md border" data-testid="role-list">
           <div className="border-b px-3 py-2 text-sm font-medium">Roles</div>
+          <div className="border-b px-2 py-1.5">
+            <div className="flex items-center gap-1">
+              <Search className="h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                value={roleSearch}
+                onChange={(e) => setRoleSearch(e.target.value)}
+                placeholder="Search…"
+                className="h-7 border-0 px-1 text-xs shadow-none focus-visible:ring-0"
+                data-testid="role-search"
+              />
+            </div>
+          </div>
           <div className="max-h-[60vh] overflow-y-auto">
             {rolesLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
-            ) : roles.length === 0 ? (
+            ) : filteredRoles.length === 0 ? (
               <p className="px-3 py-4 text-sm text-muted-foreground">No roles yet</p>
             ) : (
-              roles.map((role) => (
+              filteredRoles.map((role) => (
                 <button
                   key={role.id}
                   onClick={() => setSelectedRoleId(role.id)}

@@ -136,6 +136,8 @@ export default function CompliancePage() {
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [statusFilter, setStatusFilter] = useState<ComplianceStatus | ''>('')
+  const [searchText, setSearchText] = useState('')
+  const debouncedSearch = useDebounce(searchText, 300)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<ComplianceItem | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -165,11 +167,18 @@ export default function CompliancePage() {
     placeholderData: (prev) => prev,
   })
 
-  // Client-side status filter
-  const items = useMemo(
-    () => (statusFilter ? allItems.filter((i) => i.status === statusFilter) : allItems),
-    [allItems, statusFilter]
-  )
+  // Client-side status + search filter
+  const items = useMemo(() => {
+    let filtered = allItems
+    if (statusFilter) filtered = filtered.filter((i) => i.status === statusFilter)
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase()
+      filtered = filtered.filter(
+        (i) => i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q)
+      )
+    }
+    return filtered
+  }, [allItems, statusFilter, debouncedSearch])
 
   // ── Fetch all users for name resolution ────────────────────────────────────
   const { data: userNameMap = {} } = useQuery({
@@ -478,6 +487,18 @@ export default function CompliancePage() {
           <Plus className="mr-2 h-4 w-4" />
           Add Item
         </Button>
+      </div>
+
+      {/* ── Search ────────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2">
+        <Search className="h-4 w-4 text-muted-foreground" />
+        <Input
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          placeholder="Search by name or category…"
+          className="h-9 max-w-xs text-sm"
+          data-testid="compliance-search"
+        />
       </div>
 
       {/* ── Status filter ─────────────────────────────────────────────────── */}

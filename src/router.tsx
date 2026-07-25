@@ -53,6 +53,14 @@ const DashboardPage = () => lazyRoute(() => import('@/pages/DashboardPage'), 'da
 
 const OrdersPage = () => lazyRoute(() => import('@/pages/OrdersPage'), 'orders', 'read')
 
+const OrderDetailPage = () => lazyRoute(() => import('@/pages/OrderDetailPage'), 'orders', 'read')
+
+const CreateOrderPage = () => lazyRoute(() => import('@/pages/CreateOrderPage'), 'orders', 'create')
+
+const BuyersPage = () => lazyRoute(() => import('@/pages/system/BuyersPage'), 'orders', 'read')
+
+const ArticlesPage = () => lazyRoute(() => import('@/pages/system/ArticlesPage'), 'orders', 'read')
+
 const ProcurementPage = () =>
   lazyRoute(() => import('@/pages/ProcurementPage'), 'procurement', 'read')
 
@@ -120,6 +128,16 @@ export const router = createBrowserRouter([
         path: 'orders',
         element: <OrdersPage />,
         handle: { crumb: () => 'Orders' },
+      },
+      {
+        path: 'orders/new',
+        element: <CreateOrderPage />,
+        handle: { crumb: () => 'New Order' },
+      },
+      {
+        path: 'orders/:id',
+        element: <OrderDetailPage />,
+        handle: { crumb: () => 'Order Detail' },
       },
       {
         path: 'procurement',
@@ -198,6 +216,16 @@ export const router = createBrowserRouter([
           </RoleGuard>
         ),
         handle: { crumb: () => 'Compliance' },
+      },
+      {
+        path: 'system/buyers',
+        element: <BuyersPage />,
+        handle: { crumb: () => 'Buyers' },
+      },
+      {
+        path: 'system/articles',
+        element: <ArticlesPage />,
+        handle: { crumb: () => 'Articles' },
       },
     ],
   },
