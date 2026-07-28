@@ -2,11 +2,16 @@ import { ArrowLeft, Pencil, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 
+import { ComplaintsTab } from '@/components/orders/ComplaintsTab'
 import { MilestoneTimeline } from '@/components/orders/MilestoneTimeline'
 import { OrderStatusActions } from '@/components/orders/OrderStatusActions'
 import { OrderStatusBadge } from '@/components/orders/OrderStatusBadge'
+import { QuotationsTab } from '@/components/orders/QuotationsTab'
+import { SamplesTab } from '@/components/orders/SamplesTab'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useOrders } from '@/hooks/useOrders'
+import { useQuotations, useComplaints } from '@/hooks/useOrderTabs'
 import { formatDate, formatCurrency } from '@/lib/format'
 import { selectCan, useAuthStore } from '@/stores/authStore'
 import type { OrderStatus } from '@/types/orders'
@@ -23,6 +28,15 @@ export default function OrderDetailPage() {
   const { data: order, isPending, isError, error } = orderQuery(id!)
 
   const isDraft = order?.status === 'draft'
+  const orderNotTerminal = order ? !['cancelled', 'delivered'].includes(order.status) : false
+
+  // Tab badge counts
+  const { list: quotationList } = useQuotations(id!)
+  const quotationCount = quotationList.data?.length ?? 0
+  const { list: complaintList } = useComplaints(id!)
+  const openComplaintCount = (complaintList.data ?? []).filter(
+    (c) => c.status !== 'resolved'
+  ).length
 
   // ── Transition handler ────────────────────────────────────────────────────
   const handleTransition = (toStatus: string, cancellationReason?: string) => {
@@ -79,116 +93,182 @@ export default function OrderDetailPage() {
         )}
       </div>
 
-      {/* Key info cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <InfoCard label={t('orders.detail.buyer')} value={order.buyer.name} />
-        <InfoCard
-          label={t('orders.detail.article')}
-          value={`${order.article.article_code} — ${order.article.description}`}
-        />
-        <InfoCard label={t('orders.detail.deliveryDate')} value={formatDate(order.delivery_date)} />
-        <InfoCard label={t('orders.detail.totalQuantity')} value={String(order.total_quantity)} />
-        <InfoCard
-          label={t('orders.detail.orderType')}
-          value={t(`orders.type.${order.order_type}`)}
-        />
-        <InfoCard label={t('orders.detail.currency')} value={order.currency} />
-        <InfoCard label={t('orders.detail.unitPrice')} value={formatCurrency(order.unit_price)} />
-        {order.pi_number && <InfoCard label="PI" value={order.pi_number} />}
-        {order.lc_number && <InfoCard label="LC" value={order.lc_number} />}
-      </div>
-
-      {/* Remarks */}
-      {order.remarks && (
-        <div className="rounded-lg border p-4">
-          <p className="text-sm font-medium text-muted-foreground">{t('orders.detail.remarks')}</p>
-          <p className="mt-1 text-sm">{order.remarks}</p>
-        </div>
-      )}
-
-      {/* Size breakdown */}
-      {order.order_lines && order.order_lines.length > 0 && (
-        <div className="rounded-lg border">
-          <div className="border-b px-4 py-3">
-            <h2 className="text-sm font-semibold">{t('orders.detail.sizeBreakdown')}</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-2 text-left font-medium">{t('orders.detail.size')}</th>
-                  <th className="px-4 py-2 text-right font-medium">
-                    {t('orders.detail.quantity')}
-                  </th>
-                  <th className="px-4 py-2 text-right font-medium">
-                    {t('orders.detail.unitPrice')}
-                  </th>
-                  <th className="px-4 py-2 text-right font-medium">
-                    {t('orders.detail.lineValue')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.order_lines.map((line) => (
-                  <tr key={line.id} className="border-b last:border-b-0">
-                    <td className="px-4 py-2 tabular-nums">{line.size_label}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{line.quantity}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">
-                      {formatCurrency(line.unit_price ?? order.unit_price)}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums">
-                      {formatCurrency(line.quantity * (line.unit_price ?? order.unit_price))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t bg-muted/30 font-medium">
-                  <td className="px-4 py-2">{t('orders.detail.total')}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{lineTotal}</td>
-                  <td />
-                  <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(lineValue)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Milestone Timeline */}
-      {order.milestones && order.milestones.length > 0 && (
-        <div className="rounded-lg border p-4">
-          <h2 className="mb-4 text-sm font-semibold">{t('orders.detail.milestones')}</h2>
-          <MilestoneTimeline milestones={order.milestones} />
-        </div>
-      )}
-
-      {/* Status Actions */}
-      <div className="rounded-lg border p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold">{t('orders.detail.actions')}</h2>
-            {!isDraft && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {t('orders.detail.editDisabledTooltip')}
-              </p>
+      {/* Tabs */}
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="w-full justify-start overflow-x-auto">
+          <TabsTrigger value="overview">{t('orders.tabs.overview')}</TabsTrigger>
+          <TabsTrigger value="quotations">
+            {t('orders.tabs.quotations')}
+            {quotationCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-muted-foreground/20 px-1.5 text-xs">
+                {quotationCount}
+              </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="samples">
+            {t('orders.tabs.samples')}
+            {order.sample_approved ? (
+              <span className="ml-1.5 text-green-600 text-xs">✓</span>
+            ) : (
+              <span className="ml-1.5 text-amber-500 text-xs">●</span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="complaints">
+            {t('orders.tabs.complaints')}
+            {openComplaintCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-red-100 px-1.5 text-xs text-red-700">
+                {openComplaintCount}
+              </span>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-6">
+          {/* Key info cards */}
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <InfoCard label={t('orders.detail.buyer')} value={order.buyer.name} />
+            <InfoCard
+              label={t('orders.detail.article')}
+              value={`${order.article.article_code} — ${order.article.description}`}
+            />
+            <InfoCard
+              label={t('orders.detail.deliveryDate')}
+              value={formatDate(order.delivery_date)}
+            />
+            <InfoCard
+              label={t('orders.detail.totalQuantity')}
+              value={String(order.total_quantity)}
+            />
+            <InfoCard
+              label={t('orders.detail.orderType')}
+              value={t(`orders.type.${order.order_type}`)}
+            />
+            <InfoCard label={t('orders.detail.currency')} value={order.currency} />
+            <InfoCard
+              label={t('orders.detail.unitPrice')}
+              value={formatCurrency(order.unit_price)}
+            />
+            {order.pi_number && <InfoCard label="PI" value={order.pi_number} />}
+            {order.lc_number && <InfoCard label="LC" value={order.lc_number} />}
           </div>
-          <OrderStatusActions
-            nextAllowedStates={order.nextAllowedStates}
-            currentStatus={order.status}
-            onTransition={handleTransition}
-            isTransitioning={transitionStatus.isPending}
-            transitionError={
-              transitionStatus.error
-                ? ((transitionStatus.error as { response?: { data?: { detail?: string } } })
-                    ?.response?.data?.detail ?? t('orders.detail.transitionFailed'))
-                : null
-            }
-            disabled={!canWrite}
+
+          {/* Remarks */}
+          {order.remarks && (
+            <div className="rounded-lg border p-4">
+              <p className="text-sm font-medium text-muted-foreground">
+                {t('orders.detail.remarks')}
+              </p>
+              <p className="mt-1 text-sm">{order.remarks}</p>
+            </div>
+          )}
+
+          {/* Size breakdown */}
+          {order.order_lines && order.order_lines.length > 0 && (
+            <div className="rounded-lg border">
+              <div className="border-b px-4 py-3">
+                <h2 className="text-sm font-semibold">{t('orders.detail.sizeBreakdown')}</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="px-4 py-2 text-left font-medium">{t('orders.detail.size')}</th>
+                      <th className="px-4 py-2 text-right font-medium">
+                        {t('orders.detail.quantity')}
+                      </th>
+                      <th className="px-4 py-2 text-right font-medium">
+                        {t('orders.detail.unitPrice')}
+                      </th>
+                      <th className="px-4 py-2 text-right font-medium">
+                        {t('orders.detail.lineValue')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {order.order_lines.map((line) => (
+                      <tr key={line.id} className="border-b last:border-b-0">
+                        <td className="px-4 py-2 tabular-nums">{line.size_label}</td>
+                        <td className="px-4 py-2 text-right tabular-nums">{line.quantity}</td>
+                        <td className="px-4 py-2 text-right tabular-nums">
+                          {formatCurrency(line.unit_price ?? order.unit_price)}
+                        </td>
+                        <td className="px-4 py-2 text-right tabular-nums">
+                          {formatCurrency(line.quantity * (line.unit_price ?? order.unit_price))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t bg-muted/30 font-medium">
+                      <td className="px-4 py-2">{t('orders.detail.total')}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{lineTotal}</td>
+                      <td />
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {formatCurrency(lineValue)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Milestone Timeline */}
+          {order.milestones && order.milestones.length > 0 && (
+            <div className="rounded-lg border p-4">
+              <h2 className="mb-4 text-sm font-semibold">{t('orders.detail.milestones')}</h2>
+              <MilestoneTimeline milestones={order.milestones} />
+            </div>
+          )}
+
+          {/* Status Actions */}
+          <div className="rounded-lg border p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold">{t('orders.detail.actions')}</h2>
+                {!isDraft && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t('orders.detail.editDisabledTooltip')}
+                  </p>
+                )}
+              </div>
+              <OrderStatusActions
+                nextAllowedStates={order.nextAllowedStates}
+                currentStatus={order.status}
+                onTransition={handleTransition}
+                isTransitioning={transitionStatus.isPending}
+                transitionError={
+                  transitionStatus.error
+                    ? ((transitionStatus.error as { response?: { data?: { detail?: string } } })
+                        ?.response?.data?.detail ?? t('orders.detail.transitionFailed'))
+                    : null
+                }
+                disabled={!canWrite}
+              />
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Quotations Tab */}
+        <TabsContent value="quotations">
+          <QuotationsTab
+            orderId={id!}
+            orderCurrency={order.currency}
+            orderNotTerminal={orderNotTerminal}
           />
-        </div>
-      </div>
+        </TabsContent>
+
+        {/* Samples Tab */}
+        <TabsContent value="samples">
+          <SamplesTab orderId={id!} sampleApproved={order.sample_approved} />
+        </TabsContent>
+
+        {/* Complaints Tab */}
+        <TabsContent value="complaints">
+          <ComplaintsTab orderId={id!} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

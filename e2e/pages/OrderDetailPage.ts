@@ -64,4 +64,18 @@ export class OrderDetailPage extends BasePage {
   async expectLoaded(): Promise<void> {
     await this.statusBadge.waitFor({ state: 'visible', timeout: 10_000 })
   }
+
+  /**
+   * Confirm a transition dialog (AlertDialog or Dialog).
+   * Clicks the confirm/proceed button and waits for the dialog to dismiss.
+   */
+  async confirmTransitionDialog(_toStatus: string): Promise<void> {
+    // The dialog is either a regular Dialog (role="dialog") or an AlertDialog (role="alertdialog").
+    // Click the confirm button within whichever dialog is visible.
+    const dialog = this.page.locator('[role="dialog"], [role="alertdialog"]').filter({ hasText: /confirm|proceed|cancel/i })
+    await dialog.getByRole('button', { name: /confirm|proceed/i }).click()
+    await dialog.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {
+      // Dialog may have been removed from DOM entirely — that's also success.
+    })
+  }
 }

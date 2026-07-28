@@ -330,3 +330,230 @@ export interface ArticlesFilter {
   page?: number
   limit?: number
 }
+
+// ── Sprint 4: Quotations ────────────────────────────────────────────────────
+
+export const QUOTATION_STATUSES = ['draft', 'sent', 'won', 'lost'] as const
+export type QuotationStatus = (typeof QUOTATION_STATUSES)[number]
+
+export const QUOTATION_STATUS_META: Record<QuotationStatus, OrderStatusMeta> = {
+  draft: {
+    labelKey: 'quotations.status.draft',
+    descriptionKey: 'quotations.statusDesc.draft',
+    badgeVariant: 'secondary',
+    badgeClass: 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+  },
+  sent: {
+    labelKey: 'quotations.status.sent',
+    descriptionKey: 'quotations.statusDesc.sent',
+    badgeVariant: 'default',
+    badgeClass: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  },
+  won: {
+    labelKey: 'quotations.status.won',
+    descriptionKey: 'quotations.statusDesc.won',
+    badgeVariant: 'default',
+    badgeClass: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  },
+  lost: {
+    labelKey: 'quotations.status.lost',
+    descriptionKey: 'quotations.statusDesc.lost',
+    badgeVariant: 'destructive',
+    badgeClass: '',
+  },
+}
+
+export interface QuotationDto {
+  id: UUID
+  quotation_number: string
+  order_id: UUID
+  buyer_id: UUID
+  article_id: UUID
+  version: number
+  currency: CurrencyCode
+  total_cost?: number | null
+  margin_pct?: number | null
+  quoted_price: number
+  win_probability?: number | null
+  valid_until: ISODate
+  status: QuotationStatus
+  sent_at?: ISODateTime | null
+  outcome_reason?: string | null
+  notes?: string | null
+  createdAt: ISODateTime
+  updatedAt: ISODateTime
+}
+
+export interface CreateQuotationDto {
+  quoted_price: number
+  currency: CurrencyCode
+  win_probability?: number
+  notes?: string
+}
+
+export interface CloseQuotationDto {
+  outcome: 'won' | 'lost'
+  outcomeReason: string
+}
+
+// ── Sprint 4: Samples ────────────────────────────────────────────────────────
+
+export const SAMPLE_TYPES = [
+  'pp_sample',
+  'counter_sample',
+  'size_set',
+  'top_of_production',
+] as const
+export type SampleType = (typeof SAMPLE_TYPES)[number]
+
+export const SAMPLE_APPROVAL_STATUSES = ['pending', 'approved', 'rejected'] as const
+export type SampleApprovalStatus = (typeof SAMPLE_APPROVAL_STATUSES)[number]
+
+export const SAMPLE_APPROVAL_STATUS_META: Record<SampleApprovalStatus, OrderStatusMeta> = {
+  pending: {
+    labelKey: 'samples.approval.pending',
+    descriptionKey: 'samples.approvalDesc.pending',
+    badgeVariant: 'secondary',
+    badgeClass: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+  },
+  approved: {
+    labelKey: 'samples.approval.approved',
+    descriptionKey: 'samples.approvalDesc.approved',
+    badgeVariant: 'default',
+    badgeClass: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  },
+  rejected: {
+    labelKey: 'samples.approval.rejected',
+    descriptionKey: 'samples.approvalDesc.rejected',
+    badgeVariant: 'destructive',
+    badgeClass: '',
+  },
+}
+
+export interface SampleDto {
+  id: UUID
+  order_id: UUID
+  round_number: number
+  sample_type: SampleType
+  dispatch_date?: ISODate | null
+  received_date?: ISODate | null
+  courier?: string | null
+  tracking_no?: string | null
+  approval_status: SampleApprovalStatus
+  buyer_comment?: string | null
+  remarks?: string | null
+  createdAt: ISODateTime
+  updatedAt: ISODateTime
+}
+
+export interface CreateSampleDto {
+  sample_type: SampleType
+  dispatch_date?: ISODate
+}
+
+// ── Sprint 4: Complaints & CAPA ──────────────────────────────────────────────
+
+export const COMPLAINT_TYPES = [
+  'quality_defect',
+  'wrong_style',
+  'wrong_size',
+  'short_shipment',
+  'packaging',
+] as const
+export type ComplaintType = (typeof COMPLAINT_TYPES)[number]
+
+export const COMPLAINT_SEVERITIES = ['low', 'medium', 'high', 'critical'] as const
+export type ComplaintSeverity = (typeof COMPLAINT_SEVERITIES)[number]
+
+export const COMPLAINT_STATUSES = ['open', 'under_investigation', 'resolved'] as const
+export type ComplaintStatus = (typeof COMPLAINT_STATUSES)[number]
+
+export const COMPLAINT_STATUS_META: Record<ComplaintStatus, OrderStatusMeta> = {
+  open: {
+    labelKey: 'complaints.status.open',
+    descriptionKey: 'complaints.statusDesc.open',
+    badgeVariant: 'default',
+    badgeClass: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+  },
+  under_investigation: {
+    labelKey: 'complaints.status.investigation',
+    descriptionKey: 'complaints.statusDesc.investigation',
+    badgeVariant: 'default',
+    badgeClass: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+  },
+  resolved: {
+    labelKey: 'complaints.status.resolved',
+    descriptionKey: 'complaints.statusDesc.resolved',
+    badgeVariant: 'default',
+    badgeClass: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  },
+}
+
+export const CAPA_STATUSES = ['open', 'in_progress', 'done'] as const
+export type CapaStatus = (typeof CAPA_STATUSES)[number]
+
+export const CAPA_STATUS_META: Record<CapaStatus, OrderStatusMeta> = {
+  open: {
+    labelKey: 'capa.status.open',
+    descriptionKey: 'capa.statusDesc.open',
+    badgeVariant: 'secondary',
+    badgeClass: 'bg-gray-200 text-gray-700',
+  },
+  in_progress: {
+    labelKey: 'capa.status.inProgress',
+    descriptionKey: 'capa.statusDesc.inProgress',
+    badgeVariant: 'default',
+    badgeClass: 'bg-blue-100 text-blue-800',
+  },
+  done: {
+    labelKey: 'capa.status.done',
+    descriptionKey: 'capa.statusDesc.done',
+    badgeVariant: 'default',
+    badgeClass: 'bg-green-100 text-green-800',
+  },
+}
+
+export interface ComplaintDto {
+  id: UUID
+  complaint_no: string
+  order_id: UUID
+  complaint_date: ISODate
+  type: ComplaintType
+  severity: ComplaintSeverity
+  description: string
+  status: ComplaintStatus
+  root_cause?: string | null
+  quantity?: number | null
+  resolved_at?: ISODateTime | null
+  createdAt: ISODateTime
+  updatedAt: ISODateTime
+}
+
+export interface CapaActionDto {
+  id: UUID
+  complaint_id: UUID
+  action_type: 'corrective' | 'preventive'
+  description: string
+  owner_user_id: UUID
+  owner_name?: string
+  due_date: ISODate
+  status: CapaStatus
+  closed_at?: ISODateTime | null
+  createdAt: ISODateTime
+}
+
+export interface CreateComplaintDto {
+  type: ComplaintType
+  severity: ComplaintSeverity
+  description: string
+}
+
+export interface CreateCapaDto {
+  description: string
+  owner_user_id: UUID
+  due_date: ISODate
+}
+
+export interface UpdateCapaStatusDto {
+  status: CapaStatus
+}

@@ -230,5 +230,135 @@
     "editArticle": "Edit Article",
     "createDescription": "Fill in the details to create a new article.",
     "editDescription": "Update the article's information."
+  },
+  "orders.tabs": {
+    "overview": "Overview",
+    "quotations": "Quotations",
+    "samples": "Samples",
+    "complaints": "Complaints"
+  },
+  "quotations": {
+    "title": "Quotations",
+    "none": "No quotations yet.",
+    "newQuotation": "New Quotation",
+    "createDescription": "Create a new quotation for this order.",
+    "number": "Number",
+    "status": "Status",
+    "price": "Price",
+    "winProb": "Win %",
+    "sentAt": "Sent At",
+    "send": "Send",
+    "close": "Close",
+    "quotedPrice": "Quoted Price",
+    "currency": "Currency",
+    "winProbability": "Win Probability",
+    "notes": "Notes",
+    "autoPopulateBom": "Auto-populate from BOM",
+    "bomNotAvailable": "BOM cost auto-population is not yet available. This feature will be enabled once the BOM module is complete.",
+    "closeQuotation": "Close Quotation",
+    "closeDescription": "Record the outcome of this quotation.",
+    "won": "Won",
+    "lost": "Lost",
+    "outcomeReason": "Outcome Reason",
+    "conflictError": "Another quotation has already been marked as won for this order.",
+    "status": {
+      "draft": "Draft",
+      "sent": "Sent",
+      "won": "Won",
+      "lost": "Lost"
+    },
+    "statusDesc": {
+      "draft": "Quotation is being prepared",
+      "sent": "Quotation has been sent to the buyer",
+      "won": "Quotation was accepted by the buyer",
+      "lost": "Quotation was not accepted"
+    }
+  },
+  "samples": {
+    "title": "Sample Tracking",
+    "none": "No sample rounds yet.",
+    "approved": "Approved",
+    "pending": "Pending",
+    "addRound": "Add Sample Round",
+    "addRoundDescription": "Record a new sample round for this order.",
+    "sampleType": "Sample Type",
+    "expectedRound": "Expected Round Number",
+    "expectedRoundHint": "Auto-calculated from existing rounds. The server assigns the final round number.",
+    "dispatchDate": "Dispatch Date (optional)",
+    "approve": "Approve",
+    "reject": "Reject",
+    "approveTitle": "Approve Sample Round {{n}}?",
+    "approveDescription": "Approving this sample will unlock the \"Move to In Production\" action for this order. This cannot be undone.",
+    "roundN": "Round {{n}}",
+    "dispatched": "Dispatched",
+    "approval": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "approvalDesc": {
+      "pending": "Sample has not been reviewed",
+      "approved": "Sample was approved by the buyer",
+      "rejected": "Sample was rejected by the buyer"
+    },
+    "type": {
+      "pp_sample": "PP Sample",
+      "counter_sample": "Counter Sample",
+      "size_set": "Size Set",
+      "top_of_production": "TOP"
+    }
+  },
+  "complaints": {
+    "title": "Complaints",
+    "none": "No complaints raised.",
+    "raise": "Raise Complaint",
+    "raiseDescription": "Report a quality or delivery issue for this order.",
+    "type": "Type",
+    "severity": "Severity",
+    "description": "Description",
+    "rootCause": "Root Cause",
+    "addRootCause": "Add Root Cause",
+    "escalated": "This complaint has been escalated to management.",
+    "status": {
+      "open": "Open",
+      "investigation": "Under Investigation",
+      "resolved": "Resolved"
+    },
+    "statusDesc": {
+      "open": "Complaint has been raised",
+      "investigation": "Root cause is being investigated",
+      "resolved": "Complaint has been resolved"
+    },
+    "type": {
+      "quality_defect": "Quality Defect",
+      "wrong_style": "Wrong Style",
+      "wrong_size": "Wrong Size",
+      "short_shipment": "Short Shipment",
+      "packaging": "Packaging"
+    },
+    "severity": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "critical": "Critical"
+    }
+  },
+  "capa": {
+    "title": "CAPA Actions",
+    "add": "Add CAPA",
+    "description": "Description",
+    "owner": "Owner",
+    "ownerId": "Owner User ID",
+    "due": "Due",
+    "status": {
+      "open": "Open",
+      "inProgress": "In Progress",
+      "done": "Done"
+    },
+    "statusDesc": {
+      "open": "Action not yet started",
+      "inProgress": "Action is being worked on",
+      "done": "Action completed"
+    }
   }
 }

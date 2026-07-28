@@ -13,6 +13,14 @@ import type {
   CreateBuyerDto,
   CreateArticleDto,
   OrderStatus,
+  QuotationDto,
+  CreateQuotationDto,
+  SampleDto,
+  CreateSampleDto,
+  ComplaintDto,
+  CreateComplaintDto,
+  CapaActionDto,
+  CreateCapaDto,
 } from '@/types/orders'
 
 // ── Base URL ─────────────────────────────────────────────────────────────────
@@ -457,4 +465,171 @@ export const ordersHandlers = [
     Object.assign(article, body, { updatedAt: new Date().toISOString() })
     return HttpResponse.json({ data: article })
   }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Sprint 4: Quotations, Samples, Complaints, CAPA
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // POST /orders/:orderId/quotations — create quotation
+  http.post(`${BASE}/orders/:orderId/quotations`, async ({ params, request }) => {
+    const body = (await request.json()) as CreateQuotationDto
+    const orderId = params.orderId as string
+    const quotation: QuotationDto = {
+      id: crypto.randomUUID(),
+      quotation_number: `QT-${String(Date.now()).slice(-6)}`,
+      order_id: orderId,
+      buyer_id: orders.find((o) => o.id === orderId)?.buyer_id ?? '',
+      article_id: orders.find((o) => o.id === orderId)?.article_id ?? '',
+      version: 1,
+      currency: body.currency,
+      total_cost: null,
+      margin_pct: null,
+      quoted_price: body.quoted_price,
+      win_probability: body.win_probability ?? null,
+      valid_until: new Date(Date.now() + 30 * 24 * 3600_000).toISOString().split('T')[0]!,
+      status: 'draft',
+      sent_at: null,
+      outcome_reason: null,
+      notes: body.notes ?? null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    return HttpResponse.json({ data: quotation }, { status: 201 })
+  }),
+
+  // GET /orders/:orderId/quotations — list
+  http.get(`${BASE}/orders/:orderId/quotations`, () => {
+    return HttpResponse.json({ data: [] })
+  }),
+
+  // POST /orders/:orderId/quotations/:id/send
+  http.post(`${BASE}/orders/:orderId/quotations/:id/send`, () => {
+    return HttpResponse.json({ data: { status: 'sent' } })
+  }),
+
+  // POST /orders/:orderId/quotations/:id/close — win/loss
+  http.post(`${BASE}/orders/:orderId/quotations/:id/close`, async ({ request }) => {
+    const body = (await request.json()) as { outcome: string; outcomeReason: string }
+    // Simulate 409 Conflict when trying to mark as won
+    if (body.outcome === 'won') {
+      return HttpResponse.json(
+        { detail: 'Another quotation has already been marked as won for this order.' },
+        { status: 409 }
+      )
+    }
+    return HttpResponse.json({ data: { status: 'lost' } })
+  }),
+
+  // POST /orders/:orderId/quotations/:id/bom-populate — stub 501
+  http.post(`${BASE}/orders/:orderId/quotations/:id/bom-populate`, () => {
+    return HttpResponse.json(
+      { detail: 'BOM cost auto-population is not yet available.' },
+      { status: 501 }
+    )
+  }),
+
+  // POST /orders/:orderId/samples — create sample round
+  http.post(`${BASE}/orders/:orderId/samples`, async ({ params, request }) => {
+    const body = (await request.json()) as CreateSampleDto
+    const orderId = params.orderId as string
+    const sample: SampleDto = {
+      id: crypto.randomUUID(),
+      order_id: orderId,
+      round_number: 1,
+      sample_type: body.sample_type,
+      dispatch_date: body.dispatch_date ?? null,
+      received_date: null,
+      courier: null,
+      tracking_no: null,
+      approval_status: 'pending',
+      buyer_comment: null,
+      remarks: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    return HttpResponse.json({ data: sample }, { status: 201 })
+  }),
+
+  // GET /orders/:orderId/samples — list
+  http.get(`${BASE}/orders/:orderId/samples`, () => {
+    return HttpResponse.json({ data: [] })
+  }),
+
+  // POST /orders/:orderId/samples/:id/approve
+  http.post(`${BASE}/orders/:orderId/samples/:id/approve`, ({ params }) => {
+    // Update the order's sample_approved flag
+    const order = orders.find((o) => o.id === params.orderId)
+    if (order) order.sample_approved = true
+    return HttpResponse.json({ data: { approval_status: 'approved' } })
+  }),
+
+  // POST /orders/:orderId/samples/:id/reject
+  http.post(`${BASE}/orders/:orderId/samples/:id/reject`, () => {
+    return HttpResponse.json({ data: { approval_status: 'rejected' } })
+  }),
+
+  // POST /orders/:orderId/complaints
+  http.post(`${BASE}/orders/:orderId/complaints`, async ({ params, request }) => {
+    const body = (await request.json()) as CreateComplaintDto
+    const orderId = params.orderId as string
+    const complaint: ComplaintDto = {
+      id: crypto.randomUUID(),
+      complaint_no: `CMP-${String(Date.now()).slice(-6)}`,
+      order_id: orderId,
+      complaint_date: new Date().toISOString().split('T')[0]!,
+      type: body.type,
+      severity: body.severity,
+      description: body.description,
+      status: 'open',
+      root_cause: null,
+      quantity: null,
+      resolved_at: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    return HttpResponse.json({ data: complaint }, { status: 201 })
+  }),
+
+  // GET /orders/:orderId/complaints — list
+  http.get(`${BASE}/orders/:orderId/complaints`, () => {
+    return HttpResponse.json({ data: [] })
+  }),
+
+  // PATCH /orders/:orderId/complaints/:id/root-cause
+  http.patch(`${BASE}/orders/:orderId/complaints/:id/root-cause`, async ({ request }) => {
+    const body = (await request.json()) as { root_cause: string }
+    return HttpResponse.json({ data: { root_cause: body.root_cause } })
+  }),
+
+  // POST /orders/:orderId/complaints/:complaintId/capa
+  http.post(`${BASE}/orders/:orderId/complaints/:complaintId/capa`, async ({ params, request }) => {
+    const body = (await request.json()) as CreateCapaDto
+    const complaintId = params.complaintId as string
+    const capa: CapaActionDto = {
+      id: crypto.randomUUID(),
+      complaint_id: complaintId,
+      action_type: 'corrective',
+      description: body.description,
+      owner_user_id: body.owner_user_id,
+      due_date: body.due_date,
+      status: 'open',
+      closed_at: null,
+      createdAt: new Date().toISOString(),
+    }
+    return HttpResponse.json({ data: capa }, { status: 201 })
+  }),
+
+  // GET /orders/:orderId/complaints/:complaintId/capa
+  http.get(`${BASE}/orders/:orderId/complaints/:complaintId/capa`, () => {
+    return HttpResponse.json({ data: [] })
+  }),
+
+  // PATCH /orders/:orderId/complaints/:complaintId/capa/:capaId/status
+  http.patch(
+    `${BASE}/orders/:orderId/complaints/:complaintId/capa/:capaId/status`,
+    async ({ request }) => {
+      const body = (await request.json()) as { status: string }
+      return HttpResponse.json({ data: { status: body.status } })
+    }
+  ),
 ]
