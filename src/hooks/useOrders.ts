@@ -6,13 +6,96 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import api, { apiClient } from '@/lib/api'
 import type {
+  ArticleDto,
+  BuyerDto,
   CreateOrderDto,
   OrdersFilter,
-  OrderListResponseDto,
   OrderResponseDto,
   TransitionStatusDto,
   UpdateOrderDto,
 } from '@/types/orders'
+
+// ── List envelope normalizer ─────────────────────────────────────────────────
+// Nest may return either:
+//   { data: T[], meta }                         (ApiResponse)
+//   { data: { data: T[], meta } }               (nested list DTO)
+// MSW currently uses the first shape; production lists may use the second.
+export interface PaginatedList<T> {
+  data: T[]
+  meta: { page: number; limit: number; total: number }
+}
+
+function normalizeMeta(meta?: {
+  page?: number
+  limit?: number
+  total?: number
+  totalItems?: number
+  totalCount?: number
+}): PaginatedList<never>['meta'] {
+  return {
+    page: meta?.page ?? 1,
+    limit: meta?.limit ?? 20,
+    total: meta?.total ?? meta?.totalItems ?? meta?.totalCount ?? 0,
+  }
+}
+
+export function unwrapPaginatedList<T>(body: unknown): PaginatedList<T> {
+  if (!body || typeof body !== 'object') {
+    return { data: [], meta: { page: 1, limit: 20, total: 0 } }
+  }
+
+  const outer = body as {
+    data?: unknown
+    items?: unknown
+    meta?: Parameters<typeof normalizeMeta>[0]
+    total?: number
+  }
+
+  // Nested: { data: { data: T[], meta } } or { data: { items: T[], meta } }
+  if (outer.data && typeof outer.data === 'object' && !Array.isArray(outer.data)) {
+    const inner = outer.data as {
+      data?: unknown
+      items?: unknown
+      meta?: Parameters<typeof normalizeMeta>[0]
+      total?: number
+    }
+    if (Array.isArray(inner.data)) {
+      return {
+        data: inner.data as T[],
+        meta: normalizeMeta(inner.meta ?? { total: inner.total }),
+      }
+    }
+    if (Array.isArray(inner.items)) {
+      return {
+        data: inner.items as T[],
+        meta: normalizeMeta(inner.meta ?? { total: inner.total }),
+      }
+    }
+  }
+
+  // Flat: { data: T[], meta? }
+  if (Array.isArray(outer.data)) {
+    const meta = normalizeMeta(outer.meta ?? { total: outer.total })
+    if (!outer.meta && outer.total == null) {
+      meta.limit = (outer.data as T[]).length || 20
+      meta.total = (outer.data as T[]).length
+    }
+    return {
+      data: outer.data as T[],
+      meta,
+    }
+  }
+
+  // Alternate: { items: T[], meta? }
+  if (Array.isArray(outer.items)) {
+    return {
+      data: outer.items as T[],
+      meta: normalizeMeta(outer.meta ?? { total: outer.total }),
+    }
+  }
+
+  return { data: [], meta: { page: 1, limit: 20, total: 0 } }
+}
 
 // ── Query Key Factory ────────────────────────────────────────────────────────
 const orderKeys = {
@@ -31,10 +114,7 @@ export function useOrders() {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     return useQuery({
       queryKey: orderKeys.list(filters),
-      queryFn: async (): Promise<{
-        data: OrderResponseDto[]
-        meta: { page: number; limit: number; total: number }
-      }> => {
+      queryFn: async (): Promise<PaginatedList<OrderResponseDto>> => {
         const params: Record<string, string | number | undefined> = {
           page: filters.page ?? 1,
           limit: filters.limit ?? 20,
@@ -42,28 +122,26 @@ export function useOrders() {
         if (filters.status) {
           params.status = Array.isArray(filters.status) ? filters.status.join(',') : filters.status
         }
-        if (filters.buyer_id) params.buyer_id = filters.buyer_id
-        if (filters.delivery_date_from) params.delivery_date_from = filters.delivery_date_from
-        if (filters.delivery_date_to) params.delivery_date_to = filters.delivery_date_to
-        if (filters.search) params.search = filters.search
+        if (filters.buyerId) params.buyerId = filters.buyerId
+        if (filters.deliveryDateFrom) params.deliveryDateFrom = filters.deliveryDateFrom
+        if (filters.deliveryDateTo) params.deliveryDateTo = filters.deliveryDateTo
 
-        // Use the raw api instance to get the full response envelope
-        const { data } = await api.get<{ data: OrderListResponseDto }>('/orders', { params })
-        return data.data
+        const { data } = await api.get('/orders', { params })
+        return unwrapPaginatedList<OrderResponseDto>(data)
       },
     })
   }
 
   // ── Detail ─────────────────────────────────────────────────────────────────
   // eslint-disable-next-line react-hooks/rules-of-hooks -- nested inside a custom hook (useOrders)
-  function detail(id: string) {
+  function detail(id: string, options?: { enabled?: boolean }) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     return useQuery({
       queryKey: orderKeys.detail(id),
       queryFn: async () => {
         return apiClient.get<OrderResponseDto>(`/orders/${id}`)
       },
-      enabled: !!id,
+      enabled: options?.enabled !== false && !!id,
     })
   }
 
@@ -94,18 +172,15 @@ export function useOrders() {
       return apiClient.patch<OrderResponseDto>(`/orders/${id}/status`, dto)
     },
     onMutate: async ({ id, dto }) => {
-      // Cancel any in-flight queries for this order
       await queryClient.cancelQueries({ queryKey: orderKeys.detail(id) })
 
-      // Snapshot previous value for rollback
       const previous = queryClient.getQueryData<OrderResponseDto>(orderKeys.detail(id))
 
-      // Optimistically update the cache
       if (previous) {
         queryClient.setQueryData<OrderResponseDto>(orderKeys.detail(id), {
           ...previous,
           status: dto.toStatus as OrderResponseDto['status'],
-          nextAllowedStates: [], // temporary — backend will correct this on refetch
+          nextAllowedStates: [],
           updatedAt: new Date().toISOString(),
         })
       }
@@ -113,13 +188,11 @@ export function useOrders() {
       return { previous }
     },
     onError: (_error, { id }, context) => {
-      // Roll back to the previous value on error
       if (context?.previous) {
         queryClient.setQueryData(orderKeys.detail(id), context.previous)
       }
     },
     onSettled: (_data, _error, { id }) => {
-      // Always refetch the detail + invalidate lists to ensure consistency
       void queryClient.invalidateQueries({ queryKey: orderKeys.detail(id) })
       void queryClient.invalidateQueries({ queryKey: orderKeys.all })
     },
@@ -136,32 +209,36 @@ export function useOrders() {
 }
 
 // ── useBuyers ────────────────────────────────────────────────────────────────
+export type BuyersListFilters = {
+  search?: string
+  dropdown?: boolean
+  page?: number
+  limit?: number
+}
+
 export function useBuyers() {
   const queryClient = useQueryClient()
 
   const buyerKeys = {
     all: ['buyers'] as const,
-    list: (filters?: { search?: string; dropdown?: boolean; page?: number; limit?: number }) =>
-      ['buyers', 'list', filters ?? {}] as const,
+    list: (filters?: BuyersListFilters) => ['buyers', 'list', filters ?? {}] as const,
     detail: (id: string) => ['buyers', 'detail', id] as const,
   }
 
   // eslint-disable-next-line react-hooks/rules-of-hooks -- nested inside custom hook (useBuyers)
-  function list(
-    filters: { search?: string; dropdown?: boolean; page?: number; limit?: number } = {}
-  ) {
+  function list(filters: BuyersListFilters = {}) {
     const { search, dropdown, page, limit } = filters
     // eslint-disable-next-line react-hooks/rules-of-hooks
     return useQuery({
       queryKey: buyerKeys.list(filters),
-      queryFn: async () => {
+      queryFn: async (): Promise<PaginatedList<BuyerDto>> => {
         const params: Record<string, string | number | boolean | undefined> = {}
-        if (dropdown) params.dropdown = 'true'
+        if (dropdown) params.dropdown = true
         if (search) params.search = search
         if (page) params.page = page
         if (limit) params.limit = limit
-        const { data } = await api.get<{ data: unknown }>('/buyers', { params })
-        return data.data
+        const { data } = await api.get('/buyers', { params })
+        return unwrapPaginatedList<BuyerDto>(data)
       },
     })
   }
@@ -184,53 +261,58 @@ export function useBuyers() {
     },
   })
 
+  const removeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // Soft-delete may return an empty/partial body — avoid envelope unwrap.
+      await api.delete(`/buyers/${id}`)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: buyerKeys.all })
+    },
+  })
+
   return {
     list,
     create: createMutation,
     update: updateMutation,
+    remove: removeMutation,
     buyerKeys,
   }
 }
 
 // ── useArticles ──────────────────────────────────────────────────────────────
+export type ArticlesListFilters = {
+  search?: string
+  category?: string
+  season?: string
+  page?: number
+  limit?: number
+}
+
 export function useArticles() {
   const queryClient = useQueryClient()
 
   const articleKeys = {
     all: ['articles'] as const,
-    list: (filters?: {
-      search?: string
-      category?: string
-      season?: string
-      page?: number
-      limit?: number
-    }) => ['articles', 'list', filters ?? {}] as const,
+    list: (filters?: ArticlesListFilters) => ['articles', 'list', filters ?? {}] as const,
     detail: (id: string) => ['articles', 'detail', id] as const,
   }
 
   // eslint-disable-next-line react-hooks/rules-of-hooks -- nested inside custom hook (useArticles)
-  function list(
-    filters: {
-      search?: string
-      category?: string
-      season?: string
-      page?: number
-      limit?: number
-    } = {}
-  ) {
+  function list(filters: ArticlesListFilters = {}) {
     const { search, category, season, page, limit } = filters
     // eslint-disable-next-line react-hooks/rules-of-hooks
     return useQuery({
       queryKey: articleKeys.list(filters),
-      queryFn: async () => {
+      queryFn: async (): Promise<PaginatedList<ArticleDto>> => {
         const params: Record<string, string | number | undefined> = {}
         if (search) params.search = search
         if (category) params.category = category
         if (season) params.season = season
         if (page) params.page = page
         if (limit) params.limit = limit
-        const { data } = await api.get<{ data: unknown }>('/articles', { params })
-        return data.data
+        const { data } = await api.get('/articles', { params })
+        return unwrapPaginatedList<ArticleDto>(data)
       },
     })
   }
@@ -253,10 +335,21 @@ export function useArticles() {
     },
   })
 
+  const removeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // Soft-delete may return an empty/partial body — avoid envelope unwrap.
+      await api.delete(`/articles/${id}`)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: articleKeys.all })
+    },
+  })
+
   return {
     list,
     create: createMutation,
     update: updateMutation,
+    remove: removeMutation,
     articleKeys,
   }
 }

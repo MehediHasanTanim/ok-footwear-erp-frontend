@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useDebounce } from '@/hooks/useDebounce'
+import { unwrapPaginatedList } from '@/hooks/useOrders'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 
@@ -43,11 +44,6 @@ interface AuditLog extends AuditLogRaw {
   user: string
   /** Derived schema name (e.g. "auth" from "auth_events") */
   schemaName: string
-}
-
-interface AuditLogResponse {
-  data: AuditLogRaw[]
-  meta: { page: number; limit: number; totalItems: number }
 }
 
 /** Derive a schema (module) name from a table name, e.g. "auth_events" → "auth" */
@@ -280,12 +276,17 @@ export default function AuditLogPage() {
       params.set('page', String(page))
       params.set('limit', String(PAGE_SIZE))
 
-      // API returns { data: { data: [...], meta: {...} }, timestamp: "..." }
-      // NestJS wraps in an outer { data } — we unwrap one level here.
-      const { data: res } = await api.get<{ data: AuditLogResponse }>(
-        `/audit-logs?${params.toString()}`
-      )
-      return res.data
+      // API may return either { data: [...], meta } or { data: { data: [...], meta } }
+      const { data: body } = await api.get(`/audit-logs?${params.toString()}`)
+      const list = unwrapPaginatedList<AuditLogRaw>(body)
+      return {
+        data: list.data,
+        meta: {
+          page: list.meta.page,
+          limit: list.meta.limit,
+          totalItems: list.meta.total,
+        },
+      }
     },
     placeholderData: (prev) => prev,
   })

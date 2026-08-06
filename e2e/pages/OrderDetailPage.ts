@@ -52,6 +52,34 @@ export class OrderDetailPage extends BasePage {
     return this.testid(`transition-btn-${toStatus}`)
   }
 
+  get overviewTab(): Locator {
+    return this.page.getByRole('tab', { name: /overview/i })
+  }
+
+  get quotationsTab(): Locator {
+    return this.page.getByRole('tab', { name: /quotations/i })
+  }
+
+  get samplesTab(): Locator {
+    return this.page.getByRole('tab', { name: /samples/i })
+  }
+
+  get complaintsTab(): Locator {
+    return this.page.getByRole('tab', { name: /complaints/i })
+  }
+
+  get quotationsPanel(): Locator {
+    return this.page.getByTestId('quotations-tab')
+  }
+
+  get samplesPanel(): Locator {
+    return this.page.getByTestId('samples-tab')
+  }
+
+  get complaintsPanel(): Locator {
+    return this.page.getByTestId('complaints-tab')
+  }
+
   // ── Actions ─────────────────────────────────────────────────────────────
 
   /** Navigate to an order detail page and wait for it to load. */

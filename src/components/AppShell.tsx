@@ -9,6 +9,7 @@ import {
   DollarSign,
   LayoutDashboard,
   Menu,
+  Package,
   Shield,
   ShoppingCart,
   Users,
@@ -53,6 +54,8 @@ const NAV_GROUPS: NavGroup[] = [
     titleKey: 'Operations',
     items: [
       { to: '/orders', labelKey: 'nav.orders', icon: <ClipboardList className="h-5 w-5" /> },
+      { to: '/system/buyers', labelKey: 'nav.buyers', icon: <Building2 className="h-5 w-5" /> },
+      { to: '/system/articles', labelKey: 'nav.articles', icon: <Package className="h-5 w-5" /> },
       {
         to: '/procurement',
         labelKey: 'nav.procurement',

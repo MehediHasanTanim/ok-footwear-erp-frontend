@@ -49,23 +49,23 @@ function statusLineClass(status: MilestoneStatus): string {
 export function MilestoneTimeline({ milestones, className }: MilestoneTimelineProps) {
   const { t } = useTranslation()
 
-  // Sort milestones in chronological order by planned_date,
+  // Sort milestones in chronological order by plannedDate,
   // then by the predefined MILESTONE_ORDER for ties.
   const sorted = [...milestones].sort((a, b) => {
-    const dateA = a.planned_date
-    const dateB = b.planned_date
+    const dateA = a.plannedDate
+    const dateB = b.plannedDate
     if (dateA !== dateB) return dateA.localeCompare(dateB)
-    return MILESTONE_ORDER.indexOf(a.milestone_type) - MILESTONE_ORDER.indexOf(b.milestone_type)
+    return MILESTONE_ORDER.indexOf(a.milestoneType) - MILESTONE_ORDER.indexOf(b.milestoneType)
   })
 
   return (
     <div className={cn('space-y-0', className)} data-testid="milestone-timeline">
       {sorted.map((ms, idx) => {
         const isLast = idx === sorted.length - 1
-        const milestoneKey = `orders.milestones.${ms.milestone_type}`
+        const milestoneKey = `orders.milestones.${ms.milestoneType}`
 
         return (
-          <div key={ms.id} className="flex gap-3" data-testid={`milestone-${ms.milestone_type}`}>
+          <div key={ms.id} className="flex gap-3" data-testid={`milestone-${ms.milestoneType}`}>
             {/* Timeline connector */}
             <div className="flex flex-col items-center">
               <MilestoneIcon status={ms.status} />
@@ -82,20 +82,20 @@ export function MilestoneTimeline({ milestones, className }: MilestoneTimelinePr
                 <span
                   className={cn(
                     ms.status === 'overdue' &&
-                      !ms.actual_date &&
+                      !ms.actualDate &&
                       'text-red-600 dark:text-red-400 font-medium'
                   )}
                 >
-                  {ms.planned_date}
+                  {ms.plannedDate}
                 </span>
               </p>
-              {ms.actual_date && (
+              {ms.actualDate && (
                 <p className="text-xs text-green-700 dark:text-green-400">
                   <span>{t('orders.milestones.actual')}: </span>
-                  <span>{ms.actual_date}</span>
+                  <span>{ms.actualDate}</span>
                 </p>
               )}
-              {ms.status === 'overdue' && !ms.actual_date && (
+              {ms.status === 'overdue' && !ms.actualDate && (
                 <p className="text-xs text-red-600 dark:text-red-400 font-medium">
                   {t('orders.milestones.overdue')}
                 </p>

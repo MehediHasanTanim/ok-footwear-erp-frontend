@@ -1,28 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, Check, Loader2, ShoppingCart } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import { SizeRunInputGrid, type SizeRunMap } from '@/components/orders/SizeRunInputGrid'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useOrders } from '@/hooks/useOrders'
-import api from '@/lib/api'
+import { useArticles, useBuyers, useOrders } from '@/hooks/useOrders'
 import { formatDate, formatCurrency } from '@/lib/format'
 import { createOrderSchema, type CreateOrderFormData } from '@/lib/schemas'
 import { cn } from '@/lib/utils'
-import {
-  CURRENCY_CODES,
-  ORDER_TYPES,
-  type BuyerDropdownDto,
-  type ArticleDto,
-  type CreateOrderDto,
-} from '@/types/orders'
+import { CURRENCY_CODES, type CreateOrderDto, type UpdateOrderDto } from '@/types/orders'
 
-// ── Steps ────────────────────────────────────────────────────────────────────
 type WizardStep = 1 | 2 | 3
 
 const STEP_LABELS: Record<WizardStep, string> = {
@@ -31,30 +22,34 @@ const STEP_LABELS: Record<WizardStep, string> = {
   3: 'orders.wizard.review',
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
 export default function CreateOrderPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { create: createMutation } = useOrders()
+  const { id: editOrderId } = useParams<{ id?: string }>()
+  const isEditMode = Boolean(editOrderId)
+
+  const { create: createMutation, update: updateMutation, detail: orderDetail } = useOrders()
+  const { list: listBuyers } = useBuyers()
+  const { list: listArticles } = useArticles()
 
   const [step, setStep] = useState<WizardStep>(1)
   const [buyerSearch, setBuyerSearch] = useState('')
   const [articleSearch, setArticleSearch] = useState('')
   const [serverError, setServerError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [sizeRun, setSizeRun] = useState<SizeRunMap>({})
+  const [hydrated, setHydrated] = useState(!isEditMode)
 
-  // ── React Hook Form ────────────────────────────────────────────────────────
   const form = useForm<CreateOrderFormData>({
-    resolver: zodResolver(createOrderSchema),
+    resolver: zodResolver(createOrderSchema, undefined, { raw: true }),
     defaultValues: {
-      buyer_id: '',
-      article_id: '',
-      order_type: 'bulk',
+      buyerId: '',
+      articleId: '',
       currency: 'USD',
-      unit_price: 0,
-      total_quantity: 0,
-      delivery_date: '',
-      order_lines: [],
+      unitPrice: 0,
+      totalQuantity: 0,
+      deliveryDate: '',
+      orderLines: [],
     },
     mode: 'onChange',
   })
@@ -64,76 +59,169 @@ export default function CreateOrderPage() {
     handleSubmit,
     setValue,
     getValues,
+    reset,
+    trigger,
     control,
-    formState: { errors, isValid },
+    formState: { errors },
   } = form
 
-  const selectedBuyerId = useWatch({ control, name: 'buyer_id' })
-  const selectedArticleId = useWatch({ control, name: 'article_id' })
-  const unitPrice = useWatch({ control, name: 'unit_price' })
-  const deliveryDate = useWatch({ control, name: 'delivery_date' })
+  const selectedBuyerId = useWatch({ control, name: 'buyerId' })
+  const selectedArticleId = useWatch({ control, name: 'articleId' })
+  const unitPrice = useWatch({ control, name: 'unitPrice' })
+  const deliveryDate = useWatch({ control, name: 'deliveryDate' })
 
-  // ── Fetch buyers for searchable dropdown ────────────────────────────────────
-  const { data: buyers, isPending: buyersLoading } = useQuery({
-    queryKey: ['buyers', 'dropdown', buyerSearch],
-    queryFn: async () => {
-      const { data } = await api.get<{ data: BuyerDropdownDto[] }>('/buyers', {
-        params: { dropdown: 'true', search: buyerSearch || undefined },
-      })
-      return data.data
-    },
-    staleTime: 30_000,
+  const {
+    data: existingOrder,
+    isPending: orderLoading,
+    isError: orderError,
+  } = orderDetail(editOrderId ?? '', { enabled: isEditMode })
+
+  useEffect(() => {
+    if (!isEditMode || !existingOrder || hydrated) return
+
+    if (existingOrder.status !== 'draft') {
+      navigate(`/orders/${existingOrder.id}`, { replace: true })
+      return
+    }
+
+    const lines = existingOrder.orderLines ?? []
+    const sizeMap: SizeRunMap = {}
+    for (const line of lines) {
+      sizeMap[line.sizeLabel] = line.quantity
+    }
+    const lineUnitPrice = lines.find((l) => l.unitPrice > 0)?.unitPrice ?? 0
+
+    reset({
+      buyerId: existingOrder.buyerId,
+      articleId: existingOrder.articleId,
+      currency: existingOrder.currency,
+      unitPrice: lineUnitPrice,
+      totalQuantity: existingOrder.totalQuantity,
+      deliveryDate: existingOrder.deliveryDate,
+      orderLines: lines.map((l) => ({
+        sizeLabel: l.sizeLabel,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+      })),
+    })
+    setSizeRun(sizeMap)
+    setHydrated(true)
+  }, [isEditMode, existingOrder, hydrated, reset, navigate])
+
+  useEffect(() => {
+    const price = Number(unitPrice) || 0
+    const orderLines = Object.entries(sizeRun)
+      .filter(([, qty]) => qty > 0)
+      .map(([sizeLabel, quantity]) => ({
+        sizeLabel,
+        quantity,
+        unitPrice: price,
+      }))
+    const total = orderLines.reduce((s, l) => s + l.quantity, 0)
+    // Avoid full-form validation on every keystroke in step 1 (clears selection UX).
+    // Re-validate once the size run has quantities so submit can succeed.
+    const shouldValidate = orderLines.length > 0 && price > 0
+    setValue('orderLines', orderLines, { shouldValidate, shouldDirty: true })
+    setValue('totalQuantity', total || 0, { shouldValidate, shouldDirty: true })
+  }, [sizeRun, unitPrice, setValue])
+
+  const {
+    data: buyersPage,
+    isPending: buyersLoading,
+    isError: buyersError,
+    refetch: refetchBuyers,
+  } = listBuyers({
+    search: buyerSearch || undefined,
+    page: 1,
+    limit: 50,
   })
 
-  // ── Fetch articles for searchable dropdown ──────────────────────────────────
-  const { data: articles, isPending: articlesLoading } = useQuery({
-    queryKey: ['articles', 'list', articleSearch],
-    queryFn: async () => {
-      const { data } = await api.get<{ data: ArticleDto[] }>('/articles', {
-        params: { search: articleSearch || undefined, limit: 50 },
-      })
-      return data.data
-    },
-    staleTime: 30_000,
+  const {
+    data: articlesPage,
+    isPending: articlesLoading,
+    isError: articlesError,
+  } = listArticles({
+    search: articleSearch || undefined,
+    page: 1,
+    limit: 50,
   })
 
-  const selectedBuyer = useMemo(
-    () => buyers?.find((b) => b.id === selectedBuyerId),
-    [buyers, selectedBuyerId]
+  const buyers = useMemo(() => buyersPage?.data ?? [], [buyersPage?.data])
+  const articles = useMemo(() => articlesPage?.data ?? [], [articlesPage?.data])
+
+  const selectBuyer = useCallback(
+    (buyer: (typeof buyers)[number]) => {
+      setValue('buyerId', buyer.id, {
+        shouldValidate: true,
+        shouldDirty: true,
+        shouldTouch: true,
+      })
+      if (buyer.currency && (CURRENCY_CODES as readonly string[]).includes(buyer.currency)) {
+        setValue('currency', buyer.currency, {
+          shouldValidate: true,
+          shouldDirty: true,
+        })
+      }
+    },
+    [setValue]
   )
 
-  const selectedArticle = useMemo(
-    () => articles?.find((a) => a.id === selectedArticleId),
-    [articles, selectedArticleId]
+  const selectArticle = useCallback(
+    (article: (typeof articles)[number]) => {
+      setValue('articleId', article.id, {
+        shouldValidate: true,
+        shouldDirty: true,
+        shouldTouch: true,
+      })
+    },
+    [setValue]
   )
 
-  // ── Size run state ─────────────────────────────────────────────────────────
-  const [sizeRun, setSizeRun] = useState<SizeRunMap>({})
+  const selectedBuyer = useMemo(() => {
+    const fromList = buyers.find((b) => b.id === selectedBuyerId)
+    if (fromList) return fromList
+    if (existingOrder?.buyerId === selectedBuyerId) return existingOrder.buyer
+    return undefined
+  }, [buyers, selectedBuyerId, existingOrder])
+
+  const selectedArticle = useMemo(() => {
+    const fromList = articles.find((a) => a.id === selectedArticleId)
+    if (fromList) return fromList
+    if (existingOrder?.articleId === selectedArticleId) {
+      return {
+        ...existingOrder.article,
+        category: undefined,
+        isActive: true,
+      }
+    }
+    return undefined
+  }, [articles, selectedArticleId, existingOrder])
 
   const totalQty = useMemo(() => Object.values(sizeRun).reduce((s, q) => s + q, 0), [sizeRun])
-
   const totalValue = useMemo(() => totalQty * (unitPrice || 0), [totalQty, unitPrice])
 
-  // ── Step validation ────────────────────────────────────────────────────────
   const step1Valid =
     !!selectedBuyerId && !!selectedArticleId && (unitPrice ?? 0) > 0 && !!deliveryDate
   const step2Valid = totalQty > 0
-
   const canGoNext = step === 1 ? step1Valid : step === 2 ? step2Valid : false
+  // Do not gate on RHF isValid — size-run sync uses shouldValidate:false so isValid
+  // stays false even when the wizard data is complete.
+  const canSubmit = step1Valid && step2Valid
 
   const handleNext = useCallback(() => {
-    if (step < 3) {
-      setStep((s) => (s + 1) as WizardStep)
+    if (step === 2) {
+      // Re-validate once size lines exist so submit-time resolver errors stay accurate.
+      void trigger()
     }
-  }, [step])
+    if (step < 3) setStep((s) => (s + 1) as WizardStep)
+  }, [step, trigger])
 
   const handleBack = useCallback(() => {
-    if (step > 1) {
-      setStep((s) => (s - 1) as WizardStep)
-    }
+    if (step > 1) setStep((s) => (s - 1) as WizardStep)
   }, [step])
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
+
   const onSubmit = useCallback(
     (data: CreateOrderFormData) => {
       setServerError(null)
@@ -141,74 +229,131 @@ export default function CreateOrderPage() {
 
       const orderLines = Object.entries(sizeRun)
         .filter(([, qty]) => qty > 0)
-        .map(([size_label, quantity]) => ({ size_label, quantity }))
+        .map(([sizeLabel, quantity]) => ({
+          sizeLabel,
+          quantity,
+          unitPrice: data.unitPrice,
+        }))
+
+      const handleError = (err: unknown) => {
+        const axiosErr = err as {
+          response?: {
+            status?: number
+            data?: {
+              detail?: string
+              errors?: Record<string, string[]>
+            }
+          }
+        }
+        const problem = axiosErr?.response?.data
+        setServerError(problem?.detail ?? t('orders.wizard.createFailed'))
+
+        if (problem?.errors) {
+          const mapped: Record<string, string> = {}
+          for (const [field, msgs] of Object.entries(problem.errors)) {
+            if (msgs.length > 0 && msgs[0]) mapped[field] = msgs[0]
+          }
+          setFieldErrors(mapped)
+        }
+      }
+
+      if (isEditMode && editOrderId) {
+        // OpenAPI UpdateOrderDto — no orderLines on PATCH
+        const payload: UpdateOrderDto = {
+          currency: data.currency as UpdateOrderDto['currency'],
+          totalQuantity: totalQty,
+          deliveryDate: data.deliveryDate,
+        }
+
+        updateMutation.mutate(
+          { id: editOrderId, dto: payload },
+          {
+            onSuccess: (updated) => {
+              navigate(`/orders/${updated.id}`, { replace: true })
+            },
+            onError: handleError,
+          }
+        )
+        return
+      }
 
       const payload: CreateOrderDto = {
-        ...data,
+        buyerId: data.buyerId,
+        articleId: data.articleId,
         currency: data.currency as CreateOrderDto['currency'],
-        total_quantity: totalQty,
-        order_lines: orderLines,
+        totalQuantity: totalQty,
+        deliveryDate: data.deliveryDate,
+        orderLines,
       }
 
       createMutation.mutate(payload, {
         onSuccess: (created) => {
           navigate(`/orders/${created.id}`, { replace: true })
         },
-        onError: (err: unknown) => {
-          const axiosErr = err as {
-            response?: {
-              status?: number
-              data?: {
-                detail?: string
-                errors?: Record<string, string[]>
-              }
-            }
-          }
-          const problem = axiosErr?.response?.data
-          setServerError(problem?.detail ?? t('orders.wizard.createFailed'))
-
-          // Map server errors back to fields
-          if (problem?.errors) {
-            const mapped: Record<string, string> = {}
-            for (const [field, msgs] of Object.entries(problem.errors)) {
-              if (msgs.length > 0 && msgs[0]) mapped[field] = msgs[0]
-            }
-            setFieldErrors(mapped)
-          }
-        },
+        onError: handleError,
       })
     },
-    [sizeRun, totalQty, createMutation, navigate, t]
+    [sizeRun, totalQty, createMutation, updateMutation, navigate, t, isEditMode, editOrderId]
   )
 
-  // ── Shared Zod error messages ──────────────────────────────────────────────
   const step1FieldErrors = [
-    errors.buyer_id,
-    errors.article_id,
-    errors.unit_price,
-    errors.delivery_date,
+    errors.buyerId,
+    errors.articleId,
+    errors.unitPrice,
+    errors.deliveryDate,
     errors.currency,
   ]
     .filter(Boolean)
     .map((e) => e?.message)
 
-  const step2FieldErrors = [errors.order_lines].filter(Boolean).map((e) => e?.message)
+  const step2FieldErrors = [errors.orderLines].filter(Boolean).map((e) => e?.message)
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  if (isEditMode && orderLoading) {
+    return (
+      <div className="flex items-center justify-center py-20" data-testid="create-order-loading">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (isEditMode && (orderError || !existingOrder)) {
+    return (
+      <div className="space-y-4" data-testid="create-order-error">
+        <Button variant="outline" onClick={() => navigate('/orders')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          {t('common.back')}
+        </Button>
+        <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive">
+          {t('orders.detail.notFound')}
+        </div>
+      </div>
+    )
+  }
+
+  const buyerCode = selectedBuyer && 'code' in selectedBuyer ? selectedBuyer.code : undefined
+  const articleCode = selectedArticle?.code ?? existingOrder?.article.code
+  const sizeSystem = selectedArticle?.sizeSystem ?? existingOrder?.article.sizeSystem ?? 'EU'
+
   return (
     <div className="mx-auto max-w-3xl space-y-6" data-testid="create-order-wizard">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => navigate('/orders')}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              navigate(isEditMode && editOrderId ? `/orders/${editOrderId}` : '/orders')
+            }
+          >
             <ArrowLeft className="mr-2 h-4 w-4" />
             {t('common.back')}
           </Button>
-          <h1 className="text-2xl font-bold">{t('orders.wizard.title')}</h1>
+          <h1 className="text-2xl font-bold">
+            {isEditMode ? t('orders.wizard.editTitle') : t('orders.wizard.title')}
+          </h1>
         </div>
       </div>
 
-      {/* Step indicator */}
       <div className="flex items-center gap-2">
         {[1, 2, 3].map((s) => (
           <div key={s} className="flex items-center gap-2">
@@ -230,7 +375,6 @@ export default function CreateOrderPage() {
         ))}
       </div>
 
-      {/* Server error */}
       {serverError && (
         <div
           className="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
@@ -240,102 +384,127 @@ export default function CreateOrderPage() {
         </div>
       )}
 
-      {/* Step 1: Buyer & Article */}
+      {/* Always mounted so buyer/article selection survives step changes */}
+      <input type="hidden" {...register('buyerId')} />
+      <input type="hidden" {...register('articleId')} />
+
       {step === 1 && (
         <div className="space-y-4 rounded-lg border p-6" data-testid="wizard-step-1">
           <h2 className="text-lg font-semibold">{t('orders.wizard.selectBuyerArticle')}</h2>
 
-          {/* Buyer selector */}
           <div className="space-y-2">
             <label className="text-sm font-medium">{t('orders.wizard.buyer')}</label>
-            <Input
-              placeholder={t('orders.wizard.searchBuyer')}
-              value={buyerSearch}
-              onChange={(e) => setBuyerSearch(e.target.value)}
-            />
-            <div className="max-h-48 overflow-y-auto rounded-md border">
-              {buyersLoading ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+            {isEditMode ? (
+              <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                {selectedBuyer?.name ?? existingOrder?.buyer.name}
+                {buyerCode && <span className="text-muted-foreground"> ({buyerCode})</span>}
+              </p>
+            ) : (
+              <>
+                <Input
+                  placeholder={t('orders.wizard.searchBuyer')}
+                  value={buyerSearch}
+                  onChange={(e) => setBuyerSearch(e.target.value)}
+                />
+                <div className="max-h-48 overflow-y-auto rounded-md border">
+                  {buyersLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </div>
+                  ) : buyersError ? (
+                    <div className="space-y-2 p-3">
+                      <p className="text-sm text-destructive">
+                        {t('orders.wizard.loadBuyersFailed')}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void refetchBuyers()}
+                      >
+                        {t('common.retry', { defaultValue: 'Retry' })}
+                      </Button>
+                    </div>
+                  ) : buyers.length > 0 ? (
+                    buyers.map((b) => (
+                      <button
+                        key={b.id}
+                        type="button"
+                        className={cn(
+                          'w-full px-3 py-2 text-left text-sm hover:bg-muted',
+                          selectedBuyerId === b.id && 'bg-primary/10 font-medium'
+                        )}
+                        onClick={() => selectBuyer(b)}
+                        data-testid={`wizard-buyer-${b.id}`}
+                      >
+                        {b.name}
+                        {b.code && <span className="text-muted-foreground"> ({b.code})</span>}
+                        {b.country && (
+                          <span className="ml-2 text-xs text-muted-foreground">{b.country}</span>
+                        )}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="p-3 text-sm text-muted-foreground">{t('common.noResults')}</p>
+                  )}
                 </div>
-              ) : (
-                (buyers?.map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    className={cn(
-                      'w-full px-3 py-2 text-left text-sm hover:bg-muted',
-                      selectedBuyerId === b.id && 'bg-primary/10 font-medium'
-                    )}
-                    onClick={() => {
-                      setValue('buyer_id', b.id)
-                      // Pre-fill currency from buyer
-                      // We fetch buyer detail to get currency — for now set default
-                    }}
-                  >
-                    {b.name} <span className="text-muted-foreground">({b.buyer_code})</span>
-                    <span className="ml-2 text-xs text-muted-foreground">{b.country}</span>
-                  </button>
-                )) ?? <p className="p-3 text-sm text-muted-foreground">{t('common.noResults')}</p>)
-              )}
-            </div>
-            {errors.buyer_id && (
-              <p className="text-sm text-destructive">{errors.buyer_id.message}</p>
+              </>
             )}
+            {errors.buyerId && <p className="text-sm text-destructive">{errors.buyerId.message}</p>}
           </div>
 
-          {/* Article selector */}
           <div className="space-y-2">
             <label className="text-sm font-medium">{t('orders.wizard.article')}</label>
-            <Input
-              placeholder={t('orders.wizard.searchArticle')}
-              value={articleSearch}
-              onChange={(e) => setArticleSearch(e.target.value)}
-            />
-            <div className="max-h-48 overflow-y-auto rounded-md border">
-              {articlesLoading ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+            {isEditMode ? (
+              <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                {articleCode} — {selectedArticle?.description ?? existingOrder?.article.description}
+              </p>
+            ) : (
+              <>
+                <Input
+                  placeholder={t('orders.wizard.searchArticle')}
+                  value={articleSearch}
+                  onChange={(e) => setArticleSearch(e.target.value)}
+                />
+                <div className="max-h-48 overflow-y-auto rounded-md border">
+                  {articlesLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </div>
+                  ) : articlesError ? (
+                    <p className="p-3 text-sm text-destructive">
+                      {t('orders.wizard.loadArticlesFailed')}
+                    </p>
+                  ) : articles.length > 0 ? (
+                    articles.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        className={cn(
+                          'w-full px-3 py-2 text-left text-sm hover:bg-muted',
+                          selectedArticleId === a.id && 'bg-primary/10 font-medium'
+                        )}
+                        onClick={() => selectArticle(a)}
+                        data-testid={`wizard-article-${a.id}`}
+                      >
+                        {a.code} — {a.description}
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          ({a.sizeSystem ?? 'EU'}){a.category ? ` · ${a.category}` : ''}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="p-3 text-sm text-muted-foreground">{t('common.noResults')}</p>
+                  )}
                 </div>
-              ) : (
-                (articles?.map((a) => (
-                  <button
-                    key={a.id}
-                    type="button"
-                    className={cn(
-                      'w-full px-3 py-2 text-left text-sm hover:bg-muted',
-                      selectedArticleId === a.id && 'bg-primary/10 font-medium'
-                    )}
-                    onClick={() => setValue('article_id', a.id)}
-                  >
-                    {a.article_code} — {a.description}
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      ({a.size_system}) · {a.category}
-                    </span>
-                  </button>
-                )) ?? <p className="p-3 text-sm text-muted-foreground">{t('common.noResults')}</p>)
-              )}
-            </div>
-            {errors.article_id && (
-              <p className="text-sm text-destructive">{errors.article_id.message}</p>
+              </>
+            )}
+            {errors.articleId && (
+              <p className="text-sm text-destructive">{errors.articleId.message}</p>
             )}
           </div>
 
-          {/* Order type, currency, dates */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t('orders.wizard.orderType')}</label>
-              <select
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                {...register('order_type')}
-              >
-                {ORDER_TYPES.map((ot) => (
-                  <option key={ot} value={ot}>
-                    {t(`orders.type.${ot}`)}
-                  </option>
-                ))}
-              </select>
-            </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">{t('orders.wizard.currency')}</label>
               <select
@@ -355,22 +524,21 @@ export default function CreateOrderPage() {
                 type="number"
                 step="0.01"
                 min="0"
-                {...register('unit_price', { valueAsNumber: true })}
+                {...register('unitPrice', { valueAsNumber: true })}
               />
-              {errors.unit_price && (
-                <p className="text-sm text-destructive">{errors.unit_price.message}</p>
+              {errors.unitPrice && (
+                <p className="text-sm text-destructive">{errors.unitPrice.message}</p>
               )}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 col-span-2">
               <label className="text-sm font-medium">{t('orders.wizard.deliveryDate')}</label>
-              <Input type="date" {...register('delivery_date')} />
-              {errors.delivery_date && (
-                <p className="text-sm text-destructive">{errors.delivery_date.message}</p>
+              <Input type="date" {...register('deliveryDate')} />
+              {errors.deliveryDate && (
+                <p className="text-sm text-destructive">{errors.deliveryDate.message}</p>
               )}
             </div>
           </div>
 
-          {/* Step 1 validation errors */}
           {step1FieldErrors.length > 0 && (
             <div className="rounded-md bg-destructive/10 p-3">
               {step1FieldErrors.map((msg, i) => (
@@ -383,20 +551,19 @@ export default function CreateOrderPage() {
         </div>
       )}
 
-      {/* Step 2: Size Run Input Grid */}
       {step === 2 && (
         <div className="space-y-4 rounded-lg border p-6" data-testid="wizard-step-2">
           <h2 className="text-lg font-semibold">{t('orders.wizard.sizeRun')}</h2>
           <p className="text-sm text-muted-foreground">
             {t('orders.wizard.sizeRunDescription', {
-              article: selectedArticle?.article_code ?? '',
-              system: selectedArticle?.size_system ?? 'EU',
+              article: articleCode ?? '',
+              system: sizeSystem,
             })}
           </p>
 
-          {selectedArticle ? (
+          {selectedArticle || existingOrder?.article ? (
             <SizeRunInputGrid
-              sizeSystem={selectedArticle.size_system}
+              sizeSystem={sizeSystem}
               value={sizeRun}
               onChange={setSizeRun}
               unitPrice={unitPrice}
@@ -405,7 +572,6 @@ export default function CreateOrderPage() {
             <p className="text-sm text-muted-foreground">{t('orders.wizard.selectArticleFirst')}</p>
           )}
 
-          {/* Step 2 validation */}
           {step2FieldErrors.length > 0 && (
             <div className="rounded-md bg-destructive/10 p-3">
               {step2FieldErrors.map((msg, i) => (
@@ -415,8 +581,8 @@ export default function CreateOrderPage() {
               ))}
             </div>
           )}
-          {fieldErrors.order_lines && (
-            <p className="text-sm text-destructive">{fieldErrors.order_lines}</p>
+          {fieldErrors.orderLines && (
+            <p className="text-sm text-destructive">{fieldErrors.orderLines}</p>
           )}
 
           <div className="rounded-md bg-muted/50 p-3">
@@ -431,35 +597,66 @@ export default function CreateOrderPage() {
         </div>
       )}
 
-      {/* Step 3: Review */}
       {step === 3 && (
         <div className="space-y-4 rounded-lg border p-6" data-testid="wizard-step-3">
           <h2 className="text-lg font-semibold">{t('orders.wizard.review')}</h2>
 
+          {(errors.buyerId ||
+            errors.articleId ||
+            errors.unitPrice ||
+            errors.deliveryDate ||
+            errors.orderLines ||
+            errors.totalQuantity ||
+            errors.currency) && (
+            <div
+              className="rounded-md bg-destructive/10 p-3 space-y-1"
+              data-testid="wizard-review-errors"
+            >
+              {[
+                errors.buyerId?.message,
+                errors.articleId?.message,
+                errors.currency?.message,
+                errors.unitPrice?.message,
+                errors.deliveryDate?.message,
+                errors.totalQuantity?.message,
+                errors.orderLines?.message,
+                typeof errors.orderLines === 'object' &&
+                !Array.isArray(errors.orderLines) &&
+                'root' in errors.orderLines
+                  ? (errors.orderLines as { root?: { message?: string } }).root?.message
+                  : undefined,
+              ]
+                .filter(Boolean)
+                .map((msg, i) => (
+                  <p key={i} className="text-sm text-destructive">
+                    {msg}
+                  </p>
+                ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
-            <ReviewItem label={t('orders.wizard.buyer')} value={selectedBuyer?.name ?? ''} />
             <ReviewItem
-              label={t('orders.wizard.article')}
-              value={`${selectedArticle?.article_code} — ${selectedArticle?.description}`}
+              label={t('orders.wizard.buyer')}
+              value={selectedBuyer?.name ?? existingOrder?.buyer.name ?? ''}
             />
             <ReviewItem
-              label={t('orders.wizard.orderType')}
-              value={t(`orders.type.${getValues('order_type')}`)}
+              label={t('orders.wizard.article')}
+              value={`${articleCode} — ${selectedArticle?.description ?? existingOrder?.article.description}`}
             />
             <ReviewItem label={t('orders.wizard.currency')} value={getValues('currency')} />
             <ReviewItem
               label={t('orders.wizard.unitPrice')}
-              value={formatCurrency(getValues('unit_price'))}
+              value={formatCurrency(getValues('unitPrice'))}
             />
             <ReviewItem
               label={t('orders.wizard.deliveryDate')}
-              value={formatDate(getValues('delivery_date'))}
+              value={formatDate(getValues('deliveryDate'))}
             />
             <ReviewItem label={t('orders.wizard.totalQuantity')} value={String(totalQty)} />
             <ReviewItem label={t('orders.wizard.totalValue')} value={formatCurrency(totalValue)} />
           </div>
 
-          {/* Size breakdown summary */}
           <div className="rounded-md border p-3">
             <h3 className="mb-2 text-sm font-medium">{t('orders.wizard.sizeBreakdown')}</h3>
             <div className="flex flex-wrap gap-2">
@@ -476,9 +673,15 @@ export default function CreateOrderPage() {
         </div>
       )}
 
-      {/* Navigation buttons */}
       <div className="flex justify-between">
-        <Button variant="outline" onClick={step === 1 ? () => navigate('/orders') : handleBack}>
+        <Button
+          variant="outline"
+          onClick={
+            step === 1
+              ? () => navigate(isEditMode && editOrderId ? `/orders/${editOrderId}` : '/orders')
+              : handleBack
+          }
+        >
           <ArrowLeft className="mr-2 h-4 w-4" />
           {step === 1 ? t('common.cancel') : t('common.back')}
         </Button>
@@ -491,15 +694,15 @@ export default function CreateOrderPage() {
         ) : (
           <Button
             onClick={handleSubmit(onSubmit)}
-            disabled={createMutation.isPending || !isValid}
+            disabled={isSubmitting || !canSubmit}
             data-testid="wizard-submit-btn"
           >
-            {createMutation.isPending ? (
+            {isSubmitting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <ShoppingCart className="mr-2 h-4 w-4" />
             )}
-            {t('orders.wizard.createOrder')}
+            {isEditMode ? t('orders.wizard.saveOrder') : t('orders.wizard.createOrder')}
           </Button>
         )}
       </div>
@@ -507,7 +710,6 @@ export default function CreateOrderPage() {
   )
 }
 
-// ── Review Item Helper ───────────────────────────────────────────────────────
 function ReviewItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md bg-muted/30 p-2">

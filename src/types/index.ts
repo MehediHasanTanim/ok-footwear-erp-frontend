@@ -1,40 +1,54 @@
-// Shared domain types for OK Footwear ERP
-// All entities follow the backend schema: docs/design/OK_Footwear_ERP_Schema.sql
-
-/** ISO-8601 date string, e.g. "2026-01-15" */
+export type UUID = string
 export type ISODate = string
-
-/** ISO-8601 datetime string, e.g. "2026-01-15T10:30:00Z" */
 export type ISODateTime = string
 
-/** UUID v4 primary key */
-export type UUID = string
+export type {
+  VendorDto,
+  VendorStatus,
+  VendorType,
+  CreateVendorDto,
+  PurchaseOrderDto,
+  PoStatus,
+  CreatePurchaseOrderDto,
+  GoodsReceiptDto,
+  VendorInvoiceDto,
+  StockItemDto,
+} from './procurement'
 
-/** Audited entity with create/update timestamps */
-export interface AuditedEntity {
-  createdAt: ISODateTime
-  updatedAt: ISODateTime
-}
+export {
+  VENDOR_STATUSES,
+  VENDOR_STATUS_META,
+  VENDOR_TYPES,
+  PO_STATUSES,
+  PO_STATUS_META,
+  GRN_STATUSES,
+  GRN_QC_STATUSES,
+  INVOICE_STATUSES,
+  DEFAULT_MATCH_TOLERANCE_PCT,
+  APPROVAL_THRESHOLD_LABEL_KEY,
+  approvalThresholdForAmount,
+  isValidGrnQtySplit,
+} from './procurement'
 
-// Re-export order types
 export type {
   OrderStatus,
-  OrderType,
-  MilestoneType,
-  MilestoneStatus,
   SizeSystem,
   ArticleCategory,
+  PaymentTerms,
   CurrencyCode,
-  OrderResponseDto,
-  OrderListResponseDto,
-  OrderLineDto,
-  OrderMilestoneDto,
-  CreateOrderDto,
-  UpdateOrderDto,
-  TransitionStatusDto,
+  MilestoneType,
+  MilestoneStatus,
+  OrderStatusMeta,
   BuyerDto,
   BuyerDropdownDto,
   ArticleDto,
+  OrderLineDto,
+  OrderMilestoneDto,
+  OrderResponseDto,
+  OrderListResponseDto,
+  CreateOrderDto,
+  UpdateOrderDto,
+  TransitionStatusDto,
   CreateBuyerDto,
   UpdateBuyerDto,
   CreateArticleDto,
@@ -42,6 +56,26 @@ export type {
   OrdersFilter,
   BuyersFilter,
   ArticlesFilter,
+  QuotationStatus,
+  QuotationDto,
+  CreateQuotationDto,
+  CloseQuotationDto,
+  SampleType,
+  SampleApprovalStatus,
+  SampleDto,
+  CreateSampleDto,
+  RejectSampleDto,
+  ComplaintType,
+  ComplaintSeverity,
+  ComplaintStatus,
+  ComplaintDto,
+  CapaStatus,
+  CapaActionDto,
+  CreateComplaintDto,
+  CreateCapaDto,
+  UpdateRootCauseDto,
+  UpdateCapaStatusDto,
+  OrderType,
 } from './orders'
 
 export {
@@ -51,6 +85,7 @@ export {
   MILESTONE_STATUSES,
   SIZE_SYSTEMS,
   ARTICLE_CATEGORIES,
+  PAYMENT_TERMS,
   CURRENCY_CODES,
   SIZE_RUN_MAP,
   ORDER_STATUS_META,
@@ -65,24 +100,4 @@ export {
   COMPLAINT_SEVERITIES,
   COMPLAINT_STATUSES,
   CAPA_STATUSES,
-} from './orders'
-
-export type {
-  QuotationStatus,
-  QuotationDto,
-  CreateQuotationDto,
-  CloseQuotationDto,
-  SampleType,
-  SampleApprovalStatus,
-  SampleDto,
-  CreateSampleDto,
-  ComplaintType,
-  ComplaintSeverity,
-  ComplaintStatus,
-  ComplaintDto,
-  CreateComplaintDto,
-  CapaStatus,
-  CapaActionDto,
-  CreateCapaDto,
-  UpdateCapaStatusDto,
 } from './orders'

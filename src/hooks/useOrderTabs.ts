@@ -9,6 +9,7 @@ import type {
   QuotationDto,
   CreateQuotationDto,
   CloseQuotationDto,
+  PopulateFromBomDto,
   SampleDto,
   CreateSampleDto,
   ComplaintDto,
@@ -75,11 +76,23 @@ export function useQuotations(orderId: string) {
     },
   })
 
+  const populateFromBomMutation = useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto?: PopulateFromBomDto }) =>
+      apiClient.post<QuotationDto>(
+        `/orders/${orderId}/quotations/${id}/populate-from-bom`,
+        dto ?? {}
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.list })
+    },
+  })
+
   return {
     list: listQuery,
     create: createMutation,
     send: sendMutation,
     close: closeMutation,
+    populateFromBom: populateFromBomMutation,
     keys,
   }
 }
@@ -121,7 +134,7 @@ export function useSamples(orderId: string) {
   })
 
   const rejectMutation = useMutation({
-    mutationFn: ({ id, remarks }: { id: string; remarks?: string }) =>
+    mutationFn: ({ id, remarks }: { id: string; remarks: string }) =>
       apiClient.post<SampleDto>(`/orders/${orderId}/samples/${id}/reject`, { remarks }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: keys.list })
@@ -165,9 +178,9 @@ export function useComplaints(orderId: string) {
   })
 
   const updateRootCauseMutation = useMutation({
-    mutationFn: ({ id, root_cause }: { id: string; root_cause: string }) =>
+    mutationFn: ({ id, rootCause }: { id: string; rootCause: string }) =>
       apiClient.patch<ComplaintDto>(`/orders/${orderId}/complaints/${id}/root-cause`, {
-        root_cause,
+        rootCause,
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: keys.list })

@@ -170,12 +170,16 @@ describe('ProfilePage', () => {
 
   // AC 9: Successful verify updates state
   it('updates state after successful 2FA verify', async () => {
+    let enabled = false
     server.use(
       http.post(`${BASE_URL}/auth/2fa/setup`, () =>
         HttpResponse.json({ data: { otpauth_url: 'otpauth://test', secret: 'ABCDEFGH' } })
       ),
-      http.post(`${BASE_URL}/auth/2fa/verify`, () => HttpResponse.json({ data: { ok: true } })),
-      http.get(`${BASE_URL}/auth/2fa/status`, () => HttpResponse.json({ data: { enabled: true } }))
+      http.post(`${BASE_URL}/auth/2fa/verify`, () => {
+        enabled = true
+        return HttpResponse.json({ data: { ok: true } })
+      }),
+      http.get(`${BASE_URL}/auth/2fa/status`, () => HttpResponse.json({ data: { enabled } }))
     )
 
     render(<ProfilePage />, { initialRoute: '/profile' })

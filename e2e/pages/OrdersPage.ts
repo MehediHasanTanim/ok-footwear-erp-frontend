@@ -17,7 +17,7 @@ export class OrdersPage extends BasePage {
   }
 
   get rows(): Locator {
-    return this.testid('orders-row')
+    return this.page.locator('[data-testid^="orders-row-"]')
   }
 
   /** Get a specific row by order number. */

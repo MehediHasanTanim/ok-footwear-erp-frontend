@@ -16,7 +16,6 @@ import { formatDate, formatCurrency } from '@/lib/format'
 import { selectCan, useAuthStore } from '@/stores/authStore'
 import type { OrderStatus } from '@/types/orders'
 
-// ── Component ────────────────────────────────────────────────────────────────
 export default function OrderDetailPage() {
   const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
@@ -30,7 +29,6 @@ export default function OrderDetailPage() {
   const isDraft = order?.status === 'draft'
   const orderNotTerminal = order ? !['cancelled', 'delivered'].includes(order.status) : false
 
-  // Tab badge counts
   const { list: quotationList } = useQuotations(id!)
   const quotationCount = quotationList.data?.length ?? 0
   const { list: complaintList } = useComplaints(id!)
@@ -38,7 +36,6 @@ export default function OrderDetailPage() {
     (c) => c.status !== 'resolved'
   ).length
 
-  // ── Transition handler ────────────────────────────────────────────────────
   const handleTransition = (toStatus: string, cancellationReason?: string) => {
     transitionStatus.mutate({
       id: id!,
@@ -46,7 +43,6 @@ export default function OrderDetailPage() {
     })
   }
 
-  // ── Loading / Error states ────────────────────────────────────────────────
   if (isPending) {
     return (
       <div className="flex items-center justify-center py-20" data-testid="order-detail-loading">
@@ -69,20 +65,20 @@ export default function OrderDetailPage() {
     )
   }
 
-  const lineTotal = order.order_lines?.reduce((s, l) => s + l.quantity, 0) ?? 0
-  const lineValue =
-    order.order_lines?.reduce((s, l) => s + l.quantity * (l.unit_price ?? order.unit_price), 0) ?? 0
+  const lines = order.orderLines ?? []
+  const lineTotal = lines.reduce((s, l) => s + l.quantity, 0)
+  const lineValue = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0)
+  const displayUnitPrice = lines.find((l) => l.unitPrice > 0)?.unitPrice
 
   return (
     <div className="space-y-6" data-testid="order-detail-page">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => navigate('/orders')}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             {t('common.back')}
           </Button>
-          <h1 className="text-2xl font-bold tabular-nums">{order.order_number}</h1>
+          <h1 className="text-2xl font-bold tabular-nums">{order.orderNumber}</h1>
           <OrderStatusBadge status={order.status} />
         </div>
         {isDraft && canWrite && (
@@ -93,7 +89,6 @@ export default function OrderDetailPage() {
         )}
       </div>
 
-      {/* Tabs */}
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="overview">{t('orders.tabs.overview')}</TabsTrigger>
@@ -107,7 +102,7 @@ export default function OrderDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="samples">
             {t('orders.tabs.samples')}
-            {order.sample_approved ? (
+            {order.sampleApproved ? (
               <span className="ml-1.5 text-green-600 text-xs">✓</span>
             ) : (
               <span className="ml-1.5 text-amber-500 text-xs">●</span>
@@ -123,48 +118,31 @@ export default function OrderDetailPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
-          {/* Key info cards */}
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <InfoCard label={t('orders.detail.buyer')} value={order.buyer.name} />
             <InfoCard
               label={t('orders.detail.article')}
-              value={`${order.article.article_code} — ${order.article.description}`}
+              value={`${order.article.code} — ${order.article.description}`}
             />
             <InfoCard
               label={t('orders.detail.deliveryDate')}
-              value={formatDate(order.delivery_date)}
+              value={formatDate(order.deliveryDate)}
             />
             <InfoCard
               label={t('orders.detail.totalQuantity')}
-              value={String(order.total_quantity)}
-            />
-            <InfoCard
-              label={t('orders.detail.orderType')}
-              value={t(`orders.type.${order.order_type}`)}
+              value={String(order.totalQuantity)}
             />
             <InfoCard label={t('orders.detail.currency')} value={order.currency} />
-            <InfoCard
-              label={t('orders.detail.unitPrice')}
-              value={formatCurrency(order.unit_price)}
-            />
-            {order.pi_number && <InfoCard label="PI" value={order.pi_number} />}
-            {order.lc_number && <InfoCard label="LC" value={order.lc_number} />}
+            {displayUnitPrice != null && (
+              <InfoCard
+                label={t('orders.detail.unitPrice')}
+                value={formatCurrency(displayUnitPrice)}
+              />
+            )}
           </div>
 
-          {/* Remarks */}
-          {order.remarks && (
-            <div className="rounded-lg border p-4">
-              <p className="text-sm font-medium text-muted-foreground">
-                {t('orders.detail.remarks')}
-              </p>
-              <p className="mt-1 text-sm">{order.remarks}</p>
-            </div>
-          )}
-
-          {/* Size breakdown */}
-          {order.order_lines && order.order_lines.length > 0 && (
+          {lines.length > 0 && (
             <div className="rounded-lg border">
               <div className="border-b px-4 py-3">
                 <h2 className="text-sm font-semibold">{t('orders.detail.sizeBreakdown')}</h2>
@@ -186,15 +164,15 @@ export default function OrderDetailPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {order.order_lines.map((line) => (
-                      <tr key={line.id} className="border-b last:border-b-0">
-                        <td className="px-4 py-2 tabular-nums">{line.size_label}</td>
+                    {lines.map((line) => (
+                      <tr key={line.id ?? line.sizeLabel} className="border-b last:border-b-0">
+                        <td className="px-4 py-2 tabular-nums">{line.sizeLabel}</td>
                         <td className="px-4 py-2 text-right tabular-nums">{line.quantity}</td>
                         <td className="px-4 py-2 text-right tabular-nums">
-                          {formatCurrency(line.unit_price ?? order.unit_price)}
+                          {formatCurrency(line.unitPrice)}
                         </td>
                         <td className="px-4 py-2 text-right tabular-nums">
-                          {formatCurrency(line.quantity * (line.unit_price ?? order.unit_price))}
+                          {formatCurrency(line.quantity * line.unitPrice)}
                         </td>
                       </tr>
                     ))}
@@ -214,7 +192,6 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {/* Milestone Timeline */}
           {order.milestones && order.milestones.length > 0 && (
             <div className="rounded-lg border p-4">
               <h2 className="mb-4 text-sm font-semibold">{t('orders.detail.milestones')}</h2>
@@ -222,7 +199,6 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {/* Status Actions */}
           <div className="rounded-lg border p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -250,7 +226,6 @@ export default function OrderDetailPage() {
           </div>
         </TabsContent>
 
-        {/* Quotations Tab */}
         <TabsContent value="quotations">
           <QuotationsTab
             orderId={id!}
@@ -259,12 +234,10 @@ export default function OrderDetailPage() {
           />
         </TabsContent>
 
-        {/* Samples Tab */}
         <TabsContent value="samples">
-          <SamplesTab orderId={id!} sampleApproved={order.sample_approved} />
+          <SamplesTab orderId={id!} sampleApproved={order.sampleApproved} />
         </TabsContent>
 
-        {/* Complaints Tab */}
         <TabsContent value="complaints">
           <ComplaintsTab orderId={id!} />
         </TabsContent>
@@ -273,12 +246,11 @@ export default function OrderDetailPage() {
   )
 }
 
-// ── Info Card Helper ─────────────────────────────────────────────────────────
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-0.5 text-sm font-medium">{value}</p>
+      <p className="mt-1 text-sm font-medium">{value}</p>
     </div>
   )
 }

@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query'
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -8,8 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { OrderStatusBadge } from '@/components/orders/OrderStatusBadge'
 import { DataTable } from '@/components/table/DataTable'
 import { Button } from '@/components/ui/button'
-import { useOrders } from '@/hooks/useOrders'
-import api from '@/lib/api'
+import { useBuyers, useOrders } from '@/hooks/useOrders'
 import { formatDateShort } from '@/lib/format'
 import {
   type OrderResponseDto,
@@ -18,54 +16,37 @@ import {
   ORDER_STATUSES,
 } from '@/types/orders'
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 20
 const columnHelper = createColumnHelper<OrderResponseDto>()
 
-// ── Component ────────────────────────────────────────────────────────────────
 export default function OrdersPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
-  // ── Filter state ──────────────────────────────────────────────────────────
   const [page, setPage] = useState(0)
   const [statusFilter, setStatusFilter] = useState<OrderStatus[]>([])
   const [buyerIdFilter, setBuyerIdFilter] = useState<string>('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
-  // ── Fetch buyers for filter dropdown ───────────────────────────────────────
-  const { data: buyersDropdown } = useQuery({
-    queryKey: ['buyers', 'dropdown'],
-    queryFn: async () => {
-      const { data } = await api.get<{
-        data: { id: string; buyer_code: string; name: string; country: string }[]
-      }>('/buyers', {
-        params: { dropdown: 'true' },
-      })
-      return data.data
-    },
-    staleTime: 5 * 60_000,
-  })
+  const { data: buyersPage } = useBuyers().list({ page: 1, limit: 100 })
+  const buyersDropdown = buyersPage?.data ?? []
 
-  // ── Fetch orders ───────────────────────────────────────────────────────────
   const filters: OrdersFilter = {
     page: page + 1,
     limit: PAGE_SIZE,
-    search: undefined,
     status: statusFilter.length > 0 ? statusFilter : undefined,
-    buyer_id: buyerIdFilter || undefined,
-    delivery_date_from: dateFrom || undefined,
-    delivery_date_to: dateTo || undefined,
+    buyerId: buyerIdFilter || undefined,
+    deliveryDateFrom: dateFrom || undefined,
+    deliveryDateTo: dateTo || undefined,
   }
 
   const { data: ordersData, isPending } = useOrders().list(filters)
 
-  // ── Columns ────────────────────────────────────────────────────────────────
   const columns = useMemo(
     () =>
       [
-        columnHelper.accessor('order_number', {
+        columnHelper.accessor('orderNumber', {
           header: t('orders.list.orderNumber'),
           cell: (info) => <span className="font-medium tabular-nums">{info.getValue()}</span>,
         }),
@@ -75,17 +56,15 @@ export default function OrdersPage() {
         }),
         columnHelper.accessor('article', {
           header: t('orders.list.article'),
-          cell: (info) => (
-            <span className="text-muted-foreground">{info.getValue().article_code}</span>
-          ),
+          cell: (info) => <span className="text-muted-foreground">{info.getValue().code}</span>,
         }),
-        columnHelper.accessor('total_quantity', {
+        columnHelper.accessor('totalQuantity', {
           header: t('orders.list.totalQty'),
           cell: (info) => <span className="tabular-nums">{info.getValue()}</span>,
         }),
-        columnHelper.accessor('delivery_date', {
+        columnHelper.accessor('deliveryDate', {
           header: t('orders.list.deliveryDate'),
-          cell: (info) => <span>{formatDateShort(info.getValue())}</span>,
+          cell: (info) => <span>{formatDateShort(info.getValue() as string)}</span>,
         }),
         columnHelper.accessor('status', {
           header: t('orders.list.status'),
@@ -95,7 +74,6 @@ export default function OrdersPage() {
     [t]
   )
 
-  // ── Toggle status filter ──────────────────────────────────────────────────
   const toggleStatus = (status: OrderStatus) => {
     setStatusFilter((prev) =>
       prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
@@ -106,16 +84,16 @@ export default function OrdersPage() {
   return (
     <div className="space-y-4" data-testid="orders-page">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t('nav.orders')}</h1>
+        <h1 className="text-2xl font-bold" data-testid="orders-heading">
+          {t('nav.orders')}
+        </h1>
         <Button onClick={() => navigate('/orders/new')} data-testid="orders-new-btn">
           <Plus className="mr-2 h-4 w-4" />
           {t('orders.list.newOrder')}
         </Button>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 rounded-lg border p-3">
-        {/* Status filter chips */}
         <div className="flex flex-wrap gap-1.5">
           {ORDER_STATUSES.map((status) => (
             <Button
@@ -134,7 +112,6 @@ export default function OrdersPage() {
           ))}
         </div>
 
-        {/* Buyer filter */}
         <select
           value={buyerIdFilter}
           onChange={(e) => {
@@ -145,14 +122,14 @@ export default function OrdersPage() {
           data-testid="buyer-filter"
         >
           <option value="">{t('orders.list.allBuyers')}</option>
-          {buyersDropdown?.map((b) => (
+          {buyersDropdown.map((b) => (
             <option key={b.id} value={b.id}>
-              {b.name} ({b.buyer_code})
+              {b.name}
+              {b.code ? ` (${b.code})` : ''}
             </option>
           ))}
         </select>
 
-        {/* Date range */}
         <input
           type="date"
           value={dateFrom}
@@ -178,7 +155,6 @@ export default function OrdersPage() {
         />
       </div>
 
-      {/* Table */}
       <DataTable
         tableId="orders-list"
         columns={columns}
@@ -187,6 +163,10 @@ export default function OrdersPage() {
         pageSize={PAGE_SIZE}
         loading={isPending}
         onPaginationChange={(p) => setPage(p.pageIndex)}
+        onRowClick={(row) => navigate(`/orders/${row.id}`)}
+        getRowTestId={(row) => `orders-row-${row.orderNumber}`}
+        tableTestId="orders-table"
+        rowTestId="orders-row"
       />
     </div>
   )

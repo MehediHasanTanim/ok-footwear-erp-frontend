@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useDebounce } from '@/hooks/useDebounce'
+import { unwrapPaginatedList } from '@/hooks/useOrders'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 
@@ -160,9 +161,8 @@ export default function CompliancePage() {
   const { data: allItems = [], isPending } = useQuery({
     queryKey: ['compliance'],
     queryFn: async () => {
-      const { data: res } = await api.get<{ data: ComplianceItemRaw[] }>('/compliance-items')
-      const rawItems: ComplianceItemRaw[] = Array.isArray(res) ? res : (res.data ?? [])
-      return rawItems.map(normaliseItem)
+      const { data: body } = await api.get('/compliance-items')
+      return unwrapPaginatedList<ComplianceItemRaw>(body).data.map(normaliseItem)
     },
     placeholderData: (prev) => prev,
   })

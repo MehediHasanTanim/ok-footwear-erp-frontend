@@ -1,11 +1,21 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { createColumnHelper, type ColumnDef } from '@tanstack/react-table'
-import { Plus, Pencil, Loader2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
 import { DataTable } from '@/components/table/DataTable'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +36,14 @@ import { ARTICLE_CATEGORIES, SIZE_SYSTEMS, type ArticleDto } from '@/types/order
 const PAGE_SIZE = 20
 const columnHelper = createColumnHelper<ArticleDto>()
 
+const emptyForm: CreateArticleFormData = {
+  code: '',
+  description: '',
+  category: 'men',
+  season: '',
+  sizeSystem: 'EU',
+}
+
 export default function ArticlesManagementPage() {
   const { t } = useTranslation()
   const canWrite = useAuthStore(selectCan('orders', 'create'))
@@ -36,8 +54,9 @@ export default function ArticlesManagementPage() {
   const debouncedSearch = useDebounce(search, 300)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editingArticle, setEditingArticle] = useState<ArticleDto | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ArticleDto | null>(null)
 
-  const { list, create, update } = useArticles()
+  const { list, create, update, remove } = useArticles()
 
   const { data: articlesData, isPending } = list({
     search: debouncedSearch || undefined,
@@ -46,18 +65,9 @@ export default function ArticlesManagementPage() {
     limit: PAGE_SIZE,
   })
 
-  // ── Sheet form ─────────────────────────────────────────────────────────────
   const form = useForm<CreateArticleFormData>({
     resolver: zodResolver(createArticleSchema),
-    defaultValues: {
-      article_code: '',
-      description: '',
-      category: 'men',
-      sub_category: '',
-      gender: '',
-      season: '',
-      size_system: 'EU',
-    },
+    defaultValues: emptyForm,
   })
 
   const {
@@ -69,15 +79,7 @@ export default function ArticlesManagementPage() {
 
   const handleOpenCreate = useCallback(() => {
     setEditingArticle(null)
-    reset({
-      article_code: '',
-      description: '',
-      category: 'men',
-      sub_category: '',
-      gender: '',
-      season: '',
-      size_system: 'EU',
-    })
+    reset(emptyForm)
     setSheetOpen(true)
   }, [reset])
 
@@ -85,13 +87,11 @@ export default function ArticlesManagementPage() {
     (article: ArticleDto) => {
       setEditingArticle(article)
       reset({
-        article_code: article.article_code,
+        code: article.code,
         description: article.description,
-        category: article.category,
-        sub_category: article.sub_category ?? '',
-        gender: article.gender ?? '',
+        category: article.category ?? '',
         season: article.season ?? '',
-        size_system: article.size_system,
+        sizeSystem: article.sizeSystem ?? 'EU',
       })
       setSheetOpen(true)
     },
@@ -103,22 +103,35 @@ export default function ArticlesManagementPage() {
     setEditingArticle(null)
   }, [])
 
+  const handleConfirmDelete = useCallback(() => {
+    if (!deleteTarget) return
+    remove.mutate(deleteTarget.id, {
+      onSuccess: () => setDeleteTarget(null),
+    })
+  }, [deleteTarget, remove])
+
   const onSubmit = useCallback(
     (data: CreateArticleFormData) => {
+      const payload = {
+        code: data.code,
+        description: data.description,
+        category: data.category || undefined,
+        season: data.season || undefined,
+        sizeSystem: (data.sizeSystem || undefined) as CreateArticleFormData['sizeSystem'],
+      }
       if (editingArticle) {
-        update.mutate({ id: editingArticle.id, dto: data }, { onSuccess: handleClose })
+        update.mutate({ id: editingArticle.id, dto: payload }, { onSuccess: handleClose })
       } else {
-        create.mutate(data, { onSuccess: handleClose })
+        create.mutate(payload, { onSuccess: handleClose })
       }
     },
     [editingArticle, create, update, handleClose]
   )
 
-  // ── Columns ────────────────────────────────────────────────────────────────
   const columns = useMemo(
     () =>
       [
-        columnHelper.accessor('article_code', {
+        columnHelper.accessor('code', {
           header: t('articles.code'),
           cell: (info) => <span className="font-medium tabular-nums">{info.getValue()}</span>,
         }),
@@ -128,35 +141,61 @@ export default function ArticlesManagementPage() {
         }),
         columnHelper.accessor('category', {
           header: t('articles.category'),
-          cell: (info) => (
-            <Badge variant="secondary">{t(`articles.categories.${info.getValue()}`)}</Badge>
-          ),
+          cell: (info) => {
+            const value = info.getValue()
+            if (!value) return '—'
+            const key = `articles.categories.${value}`
+            const label = t(key)
+            return <Badge variant="secondary">{label === key ? value : label}</Badge>
+          },
         }),
-        columnHelper.accessor('size_system', {
+        columnHelper.accessor('sizeSystem', {
           header: t('articles.sizeSystem'),
-          cell: (info) => <Badge variant="outline">{info.getValue()}</Badge>,
+          cell: (info) => <Badge variant="outline">{info.getValue() ?? '—'}</Badge>,
         }),
         columnHelper.accessor('season', {
           header: t('articles.season'),
           cell: (info) => info.getValue() ?? '—',
         }),
-        columnHelper.accessor('is_active', {
+        columnHelper.accessor('isActive', {
           header: t('articles.status'),
           cell: (info) => (
-            <Badge variant={info.getValue() ? 'default' : 'secondary'}>
-              {info.getValue() ? t('articles.active') : t('articles.inactive')}
+            <Badge variant={info.getValue() !== false ? 'default' : 'secondary'}>
+              {info.getValue() !== false ? t('articles.active') : t('articles.inactive')}
             </Badge>
           ),
         }),
         columnHelper.display({
           id: 'actions',
           header: '',
-          cell: (info) =>
-            canWrite ? (
-              <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(info.row.original)}>
-                <Pencil className="h-4 w-4" />
-              </Button>
-            ) : null,
+          cell: (info) => {
+            const article = info.row.original
+            if (!canWrite) return null
+            return (
+              <div className="flex items-center justify-end gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleOpenEdit(article)}
+                  aria-label={t('common.edit')}
+                  data-testid="articles-edit-btn"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                {article.isActive !== false && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setDeleteTarget(article)}
+                    aria-label={t('common.delete')}
+                    data-testid="articles-delete-btn"
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
+            )
+          },
         }),
       ] as ColumnDef<ArticleDto>[],
     [t, canWrite, handleOpenEdit]
@@ -176,7 +215,6 @@ export default function ArticlesManagementPage() {
         )}
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <Input
           placeholder={t('articles.search')}
@@ -208,16 +246,13 @@ export default function ArticlesManagementPage() {
       <DataTable
         tableId="articles"
         columns={columns}
-        data={(articlesData as { data?: ArticleDto[]; meta?: { total: number } })?.data ?? []}
-        rowCount={
-          (articlesData as { data?: ArticleDto[]; meta?: { total: number } })?.meta?.total ?? 0
-        }
+        data={articlesData?.data ?? []}
+        rowCount={articlesData?.meta?.total ?? 0}
         pageSize={PAGE_SIZE}
         loading={isPending}
         onPaginationChange={(p) => setPage(p.pageIndex)}
       />
 
-      {/* Slide‑over panel */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
@@ -232,10 +267,8 @@ export default function ArticlesManagementPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">{t('articles.code')}</label>
-              <Input {...register('article_code')} />
-              {errors.article_code && (
-                <p className="text-sm text-destructive">{errors.article_code.message}</p>
-              )}
+              <Input {...register('code')} data-testid="articles-code" />
+              {errors.code && <p className="text-sm text-destructive">{errors.code.message}</p>}
             </div>
 
             <div className="space-y-2">
@@ -252,37 +285,26 @@ export default function ArticlesManagementPage() {
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 {...register('category')}
               >
+                <option value="">{t('articles.selectCategory')}</option>
                 {ARTICLE_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
                     {t(`articles.categories.${c}`)}
                   </option>
                 ))}
               </select>
-              {errors.category && (
-                <p className="text-sm text-destructive">{errors.category.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t('articles.subCategory')}</label>
-              <Input {...register('sub_category')} />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">{t('articles.gender')}</label>
-              <Input {...register('gender')} />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">{t('articles.season')}</label>
-              <Input {...register('season')} />
+              <Input {...register('season')} placeholder="SS24" />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">{t('articles.sizeSystem')}</label>
               <select
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                {...register('size_system')}
+                {...register('sizeSystem')}
+                data-testid="articles-size-system"
               >
                 {SIZE_SYSTEMS.map((s) => (
                   <option key={s} value={s}>
@@ -290,8 +312,8 @@ export default function ArticlesManagementPage() {
                   </option>
                 ))}
               </select>
-              {errors.size_system && (
-                <p className="text-sm text-destructive">{errors.size_system.message}</p>
+              {errors.sizeSystem && (
+                <p className="text-sm text-destructive">{errors.sizeSystem.message}</p>
               )}
             </div>
 
@@ -307,6 +329,39 @@ export default function ArticlesManagementPage() {
           </form>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !remove.isPending) setDeleteTarget(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('articles.deleteTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('articles.deleteDescription', { code: deleteTarget?.code ?? '' })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={remove.isPending} onClick={() => setDeleteTarget(null)}>
+              {t('common.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleConfirmDelete()
+              }}
+              disabled={remove.isPending}
+              data-testid="articles-delete-confirm"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {remove.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {t('common.delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

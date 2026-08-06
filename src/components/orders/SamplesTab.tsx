@@ -26,7 +26,7 @@ import {
 import { useSamples } from '@/hooks/useOrderTabs'
 import { cn } from '@/lib/utils'
 import { SAMPLE_TYPES, SAMPLE_APPROVAL_STATUS_META } from '@/types/orders'
-import type { SampleDto, SampleApprovalStatus } from '@/types/orders'
+import type { SampleDto, SampleApprovalStatus, SampleType } from '@/types/orders'
 
 interface Props {
   orderId: string
@@ -39,29 +39,31 @@ export function SamplesTab({ orderId, sampleApproved }: Props) {
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [approveTarget, setApproveTarget] = useState<SampleDto | null>(null)
-  const [sampleType, setSampleType] = useState<string>('pp_sample')
+  const [rejectTarget, setRejectTarget] = useState<SampleDto | null>(null)
+  const [rejectRemarks, setRejectRemarks] = useState('')
+  const [sampleType, setSampleType] = useState<SampleType>('PP')
   const [dispatchDate, setDispatchDate] = useState('')
 
   const samples = list.data ?? []
-  const nextRound = Math.max(...samples.map((s) => s.round_number), 0) + 1
+  const nextRound = Math.max(0, ...samples.map((s) => s.roundNumber ?? 0)) + 1
 
   const handleCreate = () => {
     create.mutate(
       {
-        sample_type: sampleType as never,
-        dispatch_date: dispatchDate || undefined,
+        sampleType,
+        dispatchDate: dispatchDate || undefined,
       },
       {
         onSuccess: () => {
           setDrawerOpen(false)
-          setSampleType('pp_sample')
+          setSampleType('PP')
           setDispatchDate('')
         },
       }
     )
   }
 
-  const StatusIcon = ({ status }: { status: SampleApprovalStatus }) => {
+  const StatusIcon = ({ status }: { status?: SampleApprovalStatus }) => {
     switch (status) {
       case 'approved':
         return <CheckCircle2 className="h-5 w-5 text-green-600" />
@@ -100,26 +102,27 @@ export function SamplesTab({ orderId, sampleApproved }: Props) {
       ) : (
         <div className="space-y-0">
           {[...samples]
-            .sort((a, b) => a.round_number - b.round_number)
+            .sort((a, b) => (a.roundNumber ?? 0) - (b.roundNumber ?? 0))
             .map((s, idx) => {
-              const meta = SAMPLE_APPROVAL_STATUS_META[s.approval_status]
+              const status = s.approvalStatus ?? 'pending'
+              const meta = SAMPLE_APPROVAL_STATUS_META[status]
               const isLast = idx === samples.length - 1
               return (
                 <div
                   key={s.id}
                   className="flex gap-3"
                   data-testid="sample-round-row"
-                  data-approval-status={s.approval_status}
+                  data-approval-status={status}
                 >
                   <div className="flex flex-col items-center">
-                    <StatusIcon status={s.approval_status} />
+                    <StatusIcon status={status} />
                     {!isLast && (
                       <div
                         className={cn(
                           'w-0.5 flex-1 min-h-[24px]',
-                          s.approval_status === 'approved'
+                          status === 'approved'
                             ? 'bg-green-500'
-                            : s.approval_status === 'rejected'
+                            : status === 'rejected'
                               ? 'bg-red-500'
                               : 'bg-gray-300'
                         )}
@@ -128,11 +131,11 @@ export function SamplesTab({ orderId, sampleApproved }: Props) {
                   </div>
                   <div className="pb-4">
                     <p className="text-sm font-medium">
-                      {t('samples.roundN', { n: s.round_number })}
+                      {t('samples.roundN', { n: s.roundNumber ?? idx + 1 })}
                     </p>
                     <p className="text-xs">
                       <Badge variant="outline" className="text-xs">
-                        {t(`samples.type.${s.sample_type}`)}
+                        {t(`samples.type.${s.sampleType}`)}
                       </Badge>
                       <Badge
                         variant={meta.badgeVariant}
@@ -141,15 +144,13 @@ export function SamplesTab({ orderId, sampleApproved }: Props) {
                         {t(meta.labelKey)}
                       </Badge>
                     </p>
-                    {s.dispatch_date && (
+                    {s.dispatchDate && (
                       <p className="text-xs text-muted-foreground">
-                        {t('samples.dispatched')}: {s.dispatch_date}
+                        {t('samples.dispatched')}: {s.dispatchDate}
                       </p>
                     )}
-                    {s.buyer_comment && (
-                      <p className="text-xs text-muted-foreground mt-1">{s.buyer_comment}</p>
-                    )}
-                    {s.approval_status === 'pending' && (
+                    {s.remarks && <p className="text-xs text-muted-foreground mt-1">{s.remarks}</p>}
+                    {status === 'pending' && (
                       <div className="mt-2 flex gap-2">
                         <Button size="sm" variant="default" onClick={() => setApproveTarget(s)}>
                           {t('samples.approve')}
@@ -157,7 +158,10 @@ export function SamplesTab({ orderId, sampleApproved }: Props) {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => reject.mutate({ id: s.id })}
+                          onClick={() => {
+                            setRejectTarget(s)
+                            setRejectRemarks('')
+                          }}
                           disabled={reject.isPending}
                         >
                           {t('samples.reject')}
@@ -171,12 +175,11 @@ export function SamplesTab({ orderId, sampleApproved }: Props) {
         </div>
       )}
 
-      {/* Approve confirmation dialog */}
       <AlertDialog open={!!approveTarget} onOpenChange={(open) => !open && setApproveTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {t('samples.approveTitle', { n: approveTarget?.round_number ?? '' })}
+              {t('samples.approveTitle', { n: approveTarget?.roundNumber ?? '' })}
             </AlertDialogTitle>
             <AlertDialogDescription>{t('samples.approveDescription')}</AlertDialogDescription>
           </AlertDialogHeader>
@@ -198,7 +201,38 @@ export function SamplesTab({ orderId, sampleApproved }: Props) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Add round drawer */}
+      <AlertDialog open={!!rejectTarget} onOpenChange={(open) => !open && setRejectTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('samples.reject')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('samples.rejectRemarksRequired')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>{t('samples.remarks')}</Label>
+            <textarea
+              className="h-20 w-full rounded-md border bg-background px-3 py-2 text-sm"
+              value={rejectRemarks}
+              onChange={(e) => setRejectRemarks(e.target.value)}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (rejectTarget && rejectRemarks.trim()) {
+                  reject.mutate({ id: rejectTarget.id, remarks: rejectRemarks.trim() })
+                  setRejectTarget(null)
+                }
+              }}
+              disabled={reject.isPending || !rejectRemarks.trim()}
+            >
+              {reject.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {t('samples.reject')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
         <SheetContent side="right" className="w-full sm:max-w-md">
           <SheetHeader>
@@ -211,7 +245,7 @@ export function SamplesTab({ orderId, sampleApproved }: Props) {
               <select
                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                 value={sampleType}
-                onChange={(e) => setSampleType(e.target.value)}
+                onChange={(e) => setSampleType(e.target.value as SampleType)}
               >
                 {SAMPLE_TYPES.map((st) => (
                   <option key={st} value={st}>

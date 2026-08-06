@@ -57,12 +57,47 @@ const OrderDetailPage = () => lazyRoute(() => import('@/pages/OrderDetailPage'),
 
 const CreateOrderPage = () => lazyRoute(() => import('@/pages/CreateOrderPage'), 'orders', 'create')
 
+const EditOrderPage = () => lazyRoute(() => import('@/pages/CreateOrderPage'), 'orders', 'update')
+
 const BuyersPage = () => lazyRoute(() => import('@/pages/system/BuyersPage'), 'orders', 'read')
 
 const ArticlesPage = () => lazyRoute(() => import('@/pages/system/ArticlesPage'), 'orders', 'read')
 
-const ProcurementPage = () =>
-  lazyRoute(() => import('@/pages/ProcurementPage'), 'procurement', 'read')
+const ProcurementLayout = () =>
+  lazyRoute(() => import('@/pages/procurement/ProcurementLayout'), 'procurement', 'read')
+
+const ProcurementHubPage = () =>
+  lazyRoute(() => import('@/pages/procurement/ProcurementHubPage'), 'procurement', 'read')
+
+const VendorsPage = () =>
+  lazyRoute(() => import('@/pages/procurement/VendorsPage'), 'procurement', 'read')
+
+const VendorCategoriesPage = () =>
+  lazyRoute(() => import('@/pages/procurement/VendorCategoriesPage'), 'procurement', 'read')
+
+const VendorDetailPage = () =>
+  lazyRoute(() => import('@/pages/procurement/VendorDetailPage'), 'procurement', 'read')
+
+const PurchaseOrdersPage = () =>
+  lazyRoute(() => import('@/pages/procurement/PurchaseOrdersPage'), 'procurement', 'read')
+
+const CreatePurchaseOrderPage = () =>
+  lazyRoute(() => import('@/pages/procurement/CreatePurchaseOrderPage'), 'procurement', 'create')
+
+const PurchaseOrderDetailPage = () =>
+  lazyRoute(() => import('@/pages/procurement/PurchaseOrderDetailPage'), 'procurement', 'read')
+
+const PoApprovalsPage = () =>
+  lazyRoute(() => import('@/pages/procurement/PoApprovalsPage'), 'procurement', 'read')
+
+const CreateGrnPage = () =>
+  lazyRoute(() => import('@/pages/procurement/CreateGrnPage'), 'procurement', 'create')
+
+const VendorInvoicesPage = () =>
+  lazyRoute(() => import('@/pages/procurement/VendorInvoicesPage'), 'procurement', 'read')
+
+const VendorInvoiceDetailPage = () =>
+  lazyRoute(() => import('@/pages/procurement/VendorInvoiceDetailPage'), 'procurement', 'read')
 
 const HRPage = () => lazyRoute(() => import('@/pages/HRPage'), 'hr', 'read')
 
@@ -135,14 +170,75 @@ export const router = createBrowserRouter([
         handle: { crumb: () => 'New Order' },
       },
       {
+        path: 'orders/:id/edit',
+        element: <EditOrderPage />,
+        handle: { crumb: () => 'Edit Order' },
+      },
+      {
         path: 'orders/:id',
         element: <OrderDetailPage />,
         handle: { crumb: () => 'Order Detail' },
       },
       {
         path: 'procurement',
-        element: <ProcurementPage />,
+        element: <ProcurementLayout />,
         handle: { crumb: () => 'Procurement' },
+        children: [
+          {
+            index: true,
+            element: <ProcurementHubPage />,
+          },
+          {
+            path: 'vendors',
+            element: <VendorsPage />,
+            handle: { crumb: () => 'Vendors' },
+          },
+          {
+            path: 'vendor-categories',
+            element: <VendorCategoriesPage />,
+            handle: { crumb: () => 'Vendor Categories' },
+          },
+          {
+            path: 'vendors/:id',
+            element: <VendorDetailPage />,
+            handle: { crumb: () => 'Vendor' },
+          },
+          {
+            path: 'purchase-orders',
+            element: <PurchaseOrdersPage />,
+            handle: { crumb: () => 'Purchase Orders' },
+          },
+          {
+            path: 'purchase-orders/new',
+            element: <CreatePurchaseOrderPage />,
+            handle: { crumb: () => 'New PO' },
+          },
+          {
+            path: 'purchase-orders/:id',
+            element: <PurchaseOrderDetailPage />,
+            handle: { crumb: () => 'PO Detail' },
+          },
+          {
+            path: 'approvals',
+            element: <PoApprovalsPage />,
+            handle: { crumb: () => 'PO Approvals' },
+          },
+          {
+            path: 'grns/new',
+            element: <CreateGrnPage />,
+            handle: { crumb: () => 'New GRN' },
+          },
+          {
+            path: 'invoices',
+            element: <VendorInvoicesPage />,
+            handle: { crumb: () => 'Vendor Invoices' },
+          },
+          {
+            path: 'invoices/:id',
+            element: <VendorInvoiceDetailPage />,
+            handle: { crumb: () => 'Invoice' },
+          },
+        ],
       },
       {
         path: 'hr',

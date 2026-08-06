@@ -14,10 +14,13 @@ describe('MSW + Axios integration', () => {
       { email: 'admin@okfootwear.com', password: 'password' }
     )
 
-    // Assert — the mocked handler returned our MOCK_USER shape
+    // Assert — login returns tokens + nested user profile
     expect(result).toMatchObject({
-      userId: MOCK_USER.userId,
-      fullName: MOCK_USER.fullName,
+      accessToken: MOCK_ACCESS_TOKEN,
+      user: {
+        id: MOCK_USER.userId,
+        fullName: MOCK_USER.fullName,
+      },
     })
   })
 

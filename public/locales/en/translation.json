@@ -6,6 +6,8 @@
   "nav": {
     "dashboard": "Dashboard",
     "orders": "Orders",
+    "buyers": "Buyers",
+    "articles": "Articles",
     "procurement": "Procurement",
     "hr": "Human Resources",
     "finance": "Finance",
@@ -43,6 +45,9 @@
     "close": "Close",
     "back": "Back",
     "next": "Next",
+    "view": "View",
+    "error": "Something went wrong.",
+    "actions": "Actions",
     "language": "Language",
     "english": "English",
     "bengali": "বাংলা",
@@ -61,7 +66,8 @@
     "tabTwoContent": "Content for Tab Two.",
     "toastMessage": "Notification sent",
     "toastDescription": "Sonner toast is working.",
-    "moduleComing": "{{module}} module coming in {{sprint}}."
+    "moduleComing": "{{module}} module coming in {{sprint}}.",
+    "retry": "Retry"
   },
   "button": {
     "default": "Default",
@@ -158,6 +164,7 @@
     },
     "wizard": {
       "title": "Create New Order",
+      "editTitle": "Edit Order",
       "buyerArticle": "Buyer & Article",
       "sizeRun": "Size Run",
       "review": "Review",
@@ -170,17 +177,18 @@
       "currency": "Currency",
       "unitPrice": "Unit Price",
       "deliveryDate": "Delivery Date",
-      "sizeRun": "Size Run",
       "sizeRunDescription": "Enter quantities for {{article}} ({{system}} sizes)",
       "selectArticleFirst": "Please select an article first to configure size run.",
       "runningTotal": "Running Total",
       "pairs": "pairs",
-      "review": "Review & Confirm",
       "totalQuantity": "Total Quantity",
       "totalValue": "Total Value",
       "sizeBreakdown": "Size Breakdown",
       "createOrder": "Create Order",
-      "createFailed": "Failed to create order. Please check your inputs and try again."
+      "saveOrder": "Save Changes",
+      "createFailed": "Failed to create order. Please check your inputs and try again.",
+      "loadBuyersFailed": "Could not load buyers. Please try again.",
+      "loadArticlesFailed": "Could not load articles. Please try again."
     }
   },
   "buyers": {
@@ -203,7 +211,16 @@
     "addBuyer": "Add Buyer",
     "editBuyer": "Edit Buyer",
     "createDescription": "Fill in the details to create a new buyer.",
-    "editDescription": "Update the buyer's information."
+    "editDescription": "Update the buyer's information.",
+    "paymentTermsOptions": {
+      "LC_SIGHT": "LC Sight",
+      "LC_USANCE": "LC Usance",
+      "TT_ADVANCE": "TT Advance",
+      "TT_30_DAYS": "TT 30 Days"
+    },
+    "selectCountry": "Select country…",
+    "deleteTitle": "Delete buyer?",
+    "deleteDescription": "This will deactivate buyer {{name}}. It will no longer appear as active."
   },
   "articles": {
     "title": "Articles",
@@ -218,7 +235,27 @@
       "sports": "Sports"
     },
     "subCategory": "Sub Category",
+    "selectSubCategory": "Select sub category…",
+    "subCategories": {
+      "casual": "Casual",
+      "formal": "Formal",
+      "boot": "Boot",
+      "sandal": "Sandal",
+      "sneaker": "Sneaker",
+      "slipper": "Slipper",
+      "loafer": "Loafer",
+      "sports": "Sports",
+      "safety": "Safety"
+    },
     "gender": "Gender",
+    "selectGender": "Select gender…",
+    "genders": {
+      "male": "Male",
+      "female": "Female",
+      "unisex": "Unisex",
+      "boys": "Boys",
+      "girls": "Girls"
+    },
     "season": "Season",
     "sizeSystem": "Size System",
     "allCategories": "All Categories",
@@ -229,7 +266,10 @@
     "addArticle": "Add Article",
     "editArticle": "Edit Article",
     "createDescription": "Fill in the details to create a new article.",
-    "editDescription": "Update the article's information."
+    "editDescription": "Update the article's information.",
+    "selectCategory": "Select category…",
+    "deleteTitle": "Delete article?",
+    "deleteDescription": "This will deactivate article {{code}}. It will no longer appear as active."
   },
   "orders.tabs": {
     "overview": "Overview",
@@ -243,7 +283,12 @@
     "newQuotation": "New Quotation",
     "createDescription": "Create a new quotation for this order.",
     "number": "Number",
-    "status": "Status",
+    "status": {
+      "draft": "Draft",
+      "sent": "Sent",
+      "won": "Won",
+      "lost": "Lost"
+    },
     "price": "Price",
     "winProb": "Win %",
     "sentAt": "Sent At",
@@ -261,12 +306,6 @@
     "lost": "Lost",
     "outcomeReason": "Outcome Reason",
     "conflictError": "Another quotation has already been marked as won for this order.",
-    "status": {
-      "draft": "Draft",
-      "sent": "Sent",
-      "won": "Won",
-      "lost": "Lost"
-    },
     "statusDesc": {
       "draft": "Quotation is being prepared",
       "sent": "Quotation has been sent to the buyer",
@@ -302,19 +341,32 @@
       "rejected": "Sample was rejected by the buyer"
     },
     "type": {
-      "pp_sample": "PP Sample",
-      "counter_sample": "Counter Sample",
+      "PP": "PP Sample",
+      "counter": "Counter Sample",
       "size_set": "Size Set",
-      "top_of_production": "TOP"
-    }
+      "TOP": "TOP"
+    },
+    "remarks": "Remarks",
+    "rejectRemarksRequired": "Please provide remarks for the rejection."
   },
   "complaints": {
     "title": "Complaints",
     "none": "No complaints raised.",
     "raise": "Raise Complaint",
     "raiseDescription": "Report a quality or delivery issue for this order.",
-    "type": "Type",
-    "severity": "Severity",
+    "type": {
+      "quality": "Quality",
+      "delivery": "Delivery",
+      "packaging": "Packaging",
+      "documentation": "Documentation",
+      "other": "Other"
+    },
+    "severity": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "critical": "Critical"
+    },
     "description": "Description",
     "rootCause": "Root Cause",
     "addRootCause": "Add Root Cause",
@@ -329,19 +381,8 @@
       "investigation": "Root cause is being investigated",
       "resolved": "Complaint has been resolved"
     },
-    "type": {
-      "quality_defect": "Quality Defect",
-      "wrong_style": "Wrong Style",
-      "wrong_size": "Wrong Size",
-      "short_shipment": "Short Shipment",
-      "packaging": "Packaging"
-    },
-    "severity": {
-      "low": "Low",
-      "medium": "Medium",
-      "high": "High",
-      "critical": "Critical"
-    }
+    "typeLabel": "Type",
+    "severityLabel": "Severity"
   },
   "capa": {
     "title": "CAPA Actions",
@@ -349,6 +390,7 @@
     "description": "Description",
     "owner": "Owner",
     "ownerId": "Owner User ID",
+    "ownerSearch": "Search owner…",
     "due": "Due",
     "status": {
       "open": "Open",
@@ -359,6 +401,177 @@
       "open": "Action not yet started",
       "inProgress": "Action is being worked on",
       "done": "Action completed"
+    }
+  },
+  "procurement": {
+    "nav": {
+      "hub": "Overview",
+      "vendors": "Vendors",
+      "categories": "Vendor Categories",
+      "purchaseOrders": "Purchase Orders",
+      "approvals": "PO Approvals",
+      "grn": "Goods Receipt",
+      "invoices": "Vendor Invoices"
+    },
+    "hub": {
+      "subtitle": "Vendors, purchase orders, goods receipts, and invoice matching.",
+      "vendorsDesc": "Manage approved and pending vendors.",
+      "categoriesDesc": "Maintain vendor category codes used when creating vendors.",
+      "poDesc": "Create and track purchase orders.",
+      "approvalsDesc": "Review POs awaiting approval.",
+      "grnDesc": "Record receipts against approved POs.",
+      "invoicesDesc": "Three-way match PO / GRN / invoice."
+    },
+    "vendorStatus": {
+      "approved": "Approved",
+      "pending": "Pending",
+      "blacklisted": "Blacklisted"
+    },
+    "vendorType": {
+      "raw_material": "Raw material",
+      "sole": "Sole",
+      "accessory": "Accessory",
+      "packaging": "Packaging",
+      "machine": "Machine",
+      "service": "Service"
+    },
+    "vendors": {
+      "code": "Code",
+      "name": "Name",
+      "type": "Type",
+      "category": "Category",
+      "status": "Status",
+      "rating": "Rating",
+      "new": "New Vendor",
+      "edit": "Edit Vendor",
+      "allStatuses": "All statuses",
+      "selectCategory": "Select category",
+      "contact": "Contact",
+      "email": "Email",
+      "phone": "Phone",
+      "tradeLicense": "Trade licence",
+      "tin": "TIN",
+      "address": "Address",
+      "paymentTerms": "Payment terms (days)",
+      "creditLimit": "Credit limit",
+      "bankName": "Bank name",
+      "bankAccount": "Bank account",
+      "notes": "Notes",
+      "days": "days",
+      "bank": "Bank",
+      "overview": "Overview",
+      "certs": "Certificates",
+      "performance": "Performance score",
+      "performanceHint": "Average quality score from GRN inspections.",
+      "certsUnavailable": "Document attachments are not available until the certificates API is enabled."
+    },
+    "categories": {
+      "subtitle": "Categories used to classify vendors (raw materials, packaging, etc.).",
+      "code": "Code",
+      "name": "Name",
+      "new": "New Category",
+      "edit": "Edit Category",
+      "deleteTitle": "Delete vendor category?",
+      "deleteDesc": "Delete {{code}} — {{name}}? This is blocked if any vendors use the category.",
+      "deleteBlocked": "Cannot delete this category while vendors are assigned to it."
+    },
+    "poStatus": {
+      "draft": "Draft",
+      "pendingApproval": "Pending approval",
+      "approved": "Approved",
+      "partiallyReceived": "Partially received",
+      "received": "Received",
+      "cancelled": "Cancelled"
+    },
+    "po": {
+      "number": "PO #",
+      "vendor": "Vendor",
+      "amount": "Amount",
+      "deliveryDate": "Expected delivery",
+      "status": "Status",
+      "new": "New Purchase Order",
+      "allStatuses": "All statuses",
+      "selectVendor": "Select vendor…",
+      "currency": "Currency",
+      "notes": "Notes",
+      "step1": "1. Header",
+      "step2": "2. Lines",
+      "step3": "3. Review",
+      "searchItem": "Search items",
+      "searchItemPlaceholder": "Search by code or name…",
+      "itemsUnavailable": "Item catalog is unavailable until the Inventory module is online.",
+      "qty": "Qty",
+      "price": "Unit price",
+      "uom": "UOM",
+      "noLines": "Add at least one line item.",
+      "total": "Total",
+      "lines": "Lines",
+      "item": "Item",
+      "saveDraft": "Save draft",
+      "submitApproval": "Submit for approval",
+      "blacklistedVendor": "Cannot create a PO for a blacklisted vendor."
+    },
+    "threshold": {
+      "lineMgr": "Line manager (<50k)",
+      "manager": "Manager (<500k)",
+      "finance": "Finance (<5M)",
+      "md": "MD (≥5M)"
+    },
+    "approvals": {
+      "subtitle": "Purchase orders waiting for approval.",
+      "empty": "No pending approvals.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approveTitle": "Approve purchase order?",
+      "approveDesc": "Approve {{number}} and notify the requester.",
+      "rejectTitle": "Reject purchase order",
+      "rejectDesc": "A reason is required.",
+      "reason": "Rejection reason",
+      "trail": "Approval trail",
+      "trailHint": "Email notifications are sent by the server at each approval step.",
+      "createdAt": "Created",
+      "approvedAt": "Approved"
+    },
+    "grn": {
+      "title": "Goods receipt entry",
+      "create": "Create GRN",
+      "po": "Purchase order",
+      "selectPo": "Select an approved PO…",
+      "receiptDate": "Receipt date",
+      "vehicle": "Vehicle no.",
+      "notes": "Notes",
+      "received": "Received",
+      "accepted": "Accepted",
+      "rejected": "Rejected",
+      "photo": "Receipt photo",
+      "qcNote": "QC note / rejection reason",
+      "qtyInvalid": "Accepted + rejected cannot exceed received qty.",
+      "saveDraft": "Save GRN",
+      "submitQc": "Save & submit QC"
+    },
+    "invoices": {
+      "subtitle": "Match vendor invoices against PO and GRN amounts.",
+      "matchForm": "Create & match",
+      "threeWay": "Three-way match",
+      "list": "Recent invoices",
+      "empty": "No invoices yet.",
+      "selectGrn": "Select GRN…",
+      "invoiceNo": "Invoice number",
+      "grossAmount": "Gross amount",
+      "approveMatch": "Approve match",
+      "poAmount": "PO amount",
+      "grnAmount": "GRN value",
+      "invoiceAmount": "Invoice",
+      "tolerance": "Tolerance",
+      "withinTolerance": "Within tolerance — ready to match.",
+      "toleranceExceeded": "Invoice exceeds three-way match tolerance.",
+      "required": "Fill vendor, GRN, invoice number, due date, and amount.",
+      "created": "Invoice created:",
+      "status": "Status",
+      "tds": "TDS",
+      "netPayable": "Net payable",
+      "due": "Due",
+      "matchStatus": "Match status"
     }
   }
 }

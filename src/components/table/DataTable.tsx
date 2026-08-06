@@ -28,6 +28,14 @@ export interface DataTableProps<T extends object> {
   loading?: boolean
   /** Page size */
   pageSize?: number
+  /** Navigate / act when a data row is clicked */
+  onRowClick?: (row: T) => void
+  /** Stable data-testid for the table element */
+  tableTestId?: string
+  /** Shared data-testid applied to every data row */
+  rowTestId?: string
+  /** Per-row data-testid (e.g. orders-row-{orderNumber}) */
+  getRowTestId?: (row: T) => string
 }
 
 // ── Virtual row threshold ────────────────────────────────────────────────────
@@ -46,6 +54,10 @@ export function DataTable<T extends object>({
   onSelectionChange,
   loading = false,
   pageSize = 20,
+  onRowClick,
+  tableTestId,
+  rowTestId,
+  getRowTestId,
 }: DataTableProps<T>) {
   const [searchValue, setSearchValue] = useState('')
 
@@ -104,7 +116,7 @@ export function DataTable<T extends object>({
         className="overflow-auto rounded-md border"
         style={{ maxHeight: shouldVirtualize ? 'calc(100vh - 250px)' : undefined }}
       >
-        <table className="w-full border-collapse">
+        <table className="w-full border-collapse" data-testid={tableTestId}>
           {/* Header */}
           <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -155,11 +167,25 @@ export function DataTable<T extends object>({
                   return (
                     <tr
                       key={row.id}
-                      className="absolute flex w-full border-b"
+                      className={`absolute flex w-full border-b ${onRowClick ? 'cursor-pointer' : ''}`}
                       style={{
                         height: `${virtualRow.size}px`,
                         transform: `translateY(${virtualRow.start}px)`,
                       }}
+                      data-testid={getRowTestId?.(row.original) ?? rowTestId}
+                      onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                      onKeyDown={
+                        onRowClick
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                onRowClick(row.original)
+                              }
+                            }
+                          : undefined
+                      }
+                      role={onRowClick ? 'link' : undefined}
+                      tabIndex={onRowClick ? 0 : undefined}
                     >
                       {row.getVisibleCells().map((cell) => (
                         <td
@@ -182,7 +208,24 @@ export function DataTable<T extends object>({
               </tr>
             ) : (
               rows.map((row) => (
-                <tr key={row.id} className="border-b hover:bg-muted/50">
+                <tr
+                  key={row.id}
+                  className={`border-b hover:bg-muted/50 ${onRowClick ? 'cursor-pointer' : ''}`}
+                  data-testid={getRowTestId?.(row.original) ?? rowTestId}
+                  onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                  onKeyDown={
+                    onRowClick
+                      ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            onRowClick(row.original)
+                          }
+                        }
+                      : undefined
+                  }
+                  role={onRowClick ? 'link' : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-4 py-3">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}

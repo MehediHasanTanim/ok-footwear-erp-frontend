@@ -6,6 +6,8 @@
   "nav": {
     "dashboard": "ড্যাশবোর্ড",
     "orders": "অর্ডার",
+    "buyers": "ক্রেতাসমূহ",
+    "articles": "আর্টিকেলসমূহ",
     "procurement": "সংগ্রহ",
     "hr": "মানবসম্পদ",
     "finance": "অর্থায়ন",
@@ -61,7 +63,8 @@
     "tabTwoContent": "ট্যাব দুইয়ের বিষয়বস্তু।",
     "toastMessage": "বিজ্ঞপ্তি পাঠানো হয়েছে",
     "toastDescription": "সোনার টোস্ট কাজ করছে।",
-    "moduleComing": "{{module}} মডিউল {{sprint}} এ আসছে।"
+    "moduleComing": "{{module}} মডিউল {{sprint}} এ আসছে।",
+    "retry": "আবার চেষ্টা"
   },
   "button": {
     "default": "ডিফল্ট",
@@ -158,6 +161,7 @@
     },
     "wizard": {
       "title": "নতুন অর্ডার তৈরি",
+      "editTitle": "অর্ডার সম্পাদনা",
       "buyerArticle": "ক্রেতা ও আর্টিকেল",
       "sizeRun": "সাইজ রান",
       "review": "পর্যালোচনা",
@@ -170,17 +174,18 @@
       "currency": "মুদ্রা",
       "unitPrice": "ইউনিট মূল্য",
       "deliveryDate": "ডেলিভারির তারিখ",
-      "sizeRun": "সাইজ রান",
       "sizeRunDescription": "{{article}} এর জন্য পরিমাণ লিখুন ({{system}} সাইজ)",
       "selectArticleFirst": "সাইজ রান কনফিগার করতে প্রথমে একটি আর্টিকেল নির্বাচন করুন।",
       "runningTotal": "চলমান মোট",
       "pairs": "জোড়া",
-      "review": "পর্যালোচনা ও নিশ্চিতকরণ",
       "totalQuantity": "মোট পরিমাণ",
       "totalValue": "মোট মূল্য",
       "sizeBreakdown": "সাইজ বিভাজন",
       "createOrder": "অর্ডার তৈরি করুন",
-      "createFailed": "অর্ডার তৈরি ব্যর্থ হয়েছে। আপনার ইনপুট চেক করে আবার চেষ্টা করুন।"
+      "saveOrder": "পরিবর্তন সংরক্ষণ",
+      "createFailed": "অর্ডার তৈরি ব্যর্থ হয়েছে। আপনার ইনপুট চেক করে আবার চেষ্টা করুন।",
+      "loadBuyersFailed": "ক্রেতা লোড করা যায়নি। আবার চেষ্টা করুন।",
+      "loadArticlesFailed": "আর্টিকেল লোড করা যায়নি। আবার চেষ্টা করুন।"
     }
   },
   "buyers": {
@@ -203,7 +208,16 @@
     "addBuyer": "ক্রেতা যোগ করুন",
     "editBuyer": "ক্রেতা সম্পাদনা",
     "createDescription": "নতুন ক্রেতা তৈরি করতে তথ্য পূরণ করুন।",
-    "editDescription": "ক্রেতার তথ্য আপডেট করুন।"
+    "editDescription": "ক্রেতার তথ্য আপডেট করুন।",
+    "paymentTermsOptions": {
+      "LC_SIGHT": "LC Sight",
+      "LC_USANCE": "LC Usance",
+      "TT_ADVANCE": "TT Advance",
+      "TT_30_DAYS": "TT 30 Days"
+    },
+    "selectCountry": "দেশ নির্বাচন…",
+    "deleteTitle": "ক্রেতা মুছবেন?",
+    "deleteDescription": "{{name}} ক্রেতাকে নিষ্ক্রিয় করা হবে। এটি আর সক্রিয় হিসেবে দেখাবে না।"
   },
   "articles": {
     "title": "আর্টিকেলসমূহ",
@@ -218,7 +232,27 @@
       "sports": "খেলাধুলা"
     },
     "subCategory": "উপ-ক্যাটাগরি",
+    "selectSubCategory": "উপ-ক্যাটাগরি নির্বাচন…",
+    "subCategories": {
+      "casual": "ক্যাজুয়াল",
+      "formal": "ফরমাল",
+      "boot": "বুট",
+      "sandal": "স্যান্ডেল",
+      "sneaker": "স্নিকার",
+      "slipper": "স্লিপার",
+      "loafer": "লোফার",
+      "sports": "খেলাধুলা",
+      "safety": "সুরক্ষা"
+    },
     "gender": "লিঙ্গ",
+    "selectGender": "লিঙ্গ নির্বাচন…",
+    "genders": {
+      "male": "পুরুষ",
+      "female": "নারী",
+      "unisex": "ইউনিসেক্স",
+      "boys": "ছেলে",
+      "girls": "মেয়ে"
+    },
     "season": "সিজন",
     "sizeSystem": "সাইজ সিস্টেম",
     "allCategories": "সকল ক্যাটাগরি",
@@ -229,6 +263,44 @@
     "addArticle": "আর্টিকেল যোগ করুন",
     "editArticle": "আর্টিকেল সম্পাদনা",
     "createDescription": "নতুন আর্টিকেল তৈরি করতে তথ্য পূরণ করুন।",
-    "editDescription": "আর্টিকেলের তথ্য আপডেট করুন।"
+    "editDescription": "আর্টিকেলের তথ্য আপডেট করুন।",
+    "selectCategory": "ক্যাটাগরি নির্বাচন…",
+    "deleteTitle": "আর্টিকেল মুছবেন?",
+    "deleteDescription": "{{code}} আর্টিকেলটি নিষ্ক্রিয় করা হবে। এটি আর সক্রিয় হিসেবে দেখাবে না।"
+  },
+  "samples": {
+    "type": {
+      "PP": "PP Sample",
+      "counter": "Counter Sample",
+      "size_set": "Size Set",
+      "TOP": "TOP"
+    },
+    "remarks": "মন্তব্য",
+    "rejectRemarksRequired": "বাতিলের কারণ লিখুন।"
+  },
+  "complaints": {
+    "type": {
+      "quality": "Quality",
+      "delivery": "Delivery",
+      "packaging": "Packaging",
+      "documentation": "Documentation",
+      "other": "Other"
+    },
+    "typeLabel": "ধরন",
+    "severityLabel": "তীব্রতা"
+  },
+  "procurement": {
+    "nav": {
+      "hub": "ওভারভিউ",
+      "vendors": "ভেন্ডর",
+      "categories": "ভেন্ডর ক্যাটাগরি",
+      "purchaseOrders": "ক্রয় আদেশ",
+      "approvals": "পিও অনুমোদন",
+      "grn": "গ্রহণ রসিদ",
+      "invoices": "ভেন্ডর চালান"
+    },
+    "hub": {
+      "subtitle": "ভেন্ডর, ক্রয় আদেশ, গ্রহণ রসিদ এবং চালান মিলকরণ।"
+    }
   }
 }

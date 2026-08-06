@@ -1,4 +1,4 @@
-// ── Orders MSW Handlers (v2 syntax) ──────────────────────────────────────────
+// ── Orders MSW Handlers (v2 syntax) — camelCase aligned to OpenAPI ───────────
 import { http, HttpResponse } from 'msw'
 
 import type { ApiResponse } from '@/lib/api'
@@ -23,16 +23,15 @@ import type {
   CreateCapaDto,
 } from '@/types/orders'
 
-// ── Base URL ─────────────────────────────────────────────────────────────────
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:7100/api'
 
-// ── In‑memory store (reset between tests) ───────────────────────────────────
 let orders: OrderResponseDto[] = []
 let buyers: BuyerDto[] = []
 let articles: ArticleDto[] = []
+let quotations: QuotationDto[] = []
+let samples: SampleDto[] = []
 let orderCounter = 1
 
-// ── Seed helpers ─────────────────────────────────────────────────────────────
 export function seedOrder(order: OrderResponseDto): void {
   orders.push(order)
 }
@@ -45,46 +44,45 @@ export function seedArticle(article: ArticleDto): void {
   articles.push(article)
 }
 
+export function seedSample(sample: SampleDto): void {
+  samples.push(sample)
+}
+
 export function resetOrdersStore(): void {
   orders = []
   buyers = []
   articles = []
+  quotations = []
+  samples = []
   orderCounter = 1
 }
 
-// ── Factory helpers ──────────────────────────────────────────────────────────
 function makeOrder(overrides: Partial<OrderResponseDto> = {}): OrderResponseDto {
   const id = overrides.id ?? crypto.randomUUID()
   return {
     id,
-    order_number: overrides.order_number ?? `ORD-${String(orderCounter++).padStart(6, '0')}`,
-    buyer_id: overrides.buyer_id ?? 'buyer-1',
+    orderNumber: overrides.orderNumber ?? `ORD-${String(orderCounter++).padStart(6, '0')}`,
+    buyerId: overrides.buyerId ?? 'buyer-1',
     buyer: overrides.buyer ?? {
       id: 'buyer-1',
-      buyer_code: 'BUY001',
+      code: 'BUY001',
       name: 'Test Buyer',
       currency: 'USD',
     },
-    article_id: overrides.article_id ?? 'article-1',
+    articleId: overrides.articleId ?? 'article-1',
     article: overrides.article ?? {
       id: 'article-1',
-      article_code: 'ART001',
+      code: 'ART001',
       description: 'Test Article',
-      size_system: 'EU',
+      sizeSystem: 'EU',
     },
-    order_type: overrides.order_type ?? 'bulk',
-    season: overrides.season,
     status: overrides.status ?? 'draft',
     currency: overrides.currency ?? 'USD',
-    unit_price: overrides.unit_price ?? 10.5,
-    total_quantity: overrides.total_quantity ?? 100,
-    delivery_date: overrides.delivery_date ?? '2026-12-31',
-    pi_number: overrides.pi_number,
-    lc_number: overrides.lc_number,
-    sample_approved: overrides.sample_approved ?? false,
-    remarks: overrides.remarks,
+    totalQuantity: overrides.totalQuantity ?? 100,
+    deliveryDate: overrides.deliveryDate ?? '2026-12-31',
+    sampleApproved: overrides.sampleApproved ?? false,
     nextAllowedStates: overrides.nextAllowedStates ?? ['confirmed', 'cancelled'],
-    order_lines: overrides.order_lines ?? [],
+    orderLines: overrides.orderLines ?? [],
     milestones: overrides.milestones ?? [],
     createdAt: overrides.createdAt ?? new Date().toISOString(),
     updatedAt: overrides.updatedAt ?? new Date().toISOString(),
@@ -94,18 +92,13 @@ function makeOrder(overrides: Partial<OrderResponseDto> = {}): OrderResponseDto 
 function makeBuyer(overrides: Partial<BuyerDto> = {}): BuyerDto {
   return {
     id: overrides.id ?? crypto.randomUUID(),
-    buyer_code: overrides.buyer_code ?? 'BUY001',
     name: overrides.name ?? 'Test Buyer',
-    contact_name: overrides.contact_name,
-    email: overrides.email,
-    phone: overrides.phone,
-    address: overrides.address,
-    country: overrides.country ?? 'Bangladesh',
-    payment_terms: overrides.payment_terms ?? 30,
-    credit_limit: overrides.credit_limit ?? 100000,
     currency: overrides.currency ?? 'USD',
-    is_active: overrides.is_active ?? true,
-    notes: overrides.notes,
+    paymentTerms: overrides.paymentTerms ?? 'LC_SIGHT',
+    creditLimit: overrides.creditLimit ?? 100000,
+    country: overrides.country ?? 'Bangladesh',
+    code: overrides.code,
+    isActive: overrides.isActive ?? true,
     createdAt: overrides.createdAt ?? new Date().toISOString(),
     updatedAt: overrides.updatedAt ?? new Date().toISOString(),
   }
@@ -114,20 +107,17 @@ function makeBuyer(overrides: Partial<BuyerDto> = {}): BuyerDto {
 function makeArticle(overrides: Partial<ArticleDto> = {}): ArticleDto {
   return {
     id: overrides.id ?? crypto.randomUUID(),
-    article_code: overrides.article_code ?? 'ART001',
+    code: overrides.code ?? 'ART001',
     description: overrides.description ?? 'Test Article',
     category: overrides.category ?? 'men',
-    sub_category: overrides.sub_category,
-    gender: overrides.gender,
     season: overrides.season,
-    size_system: overrides.size_system ?? 'EU',
-    is_active: overrides.is_active ?? true,
+    sizeSystem: overrides.sizeSystem ?? 'EU',
+    isActive: overrides.isActive ?? true,
     createdAt: overrides.createdAt ?? new Date().toISOString(),
     updatedAt: overrides.updatedAt ?? new Date().toISOString(),
   }
 }
 
-// ── State machine logic (mirrors backend for nextAllowedStates) ────────────
 const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   draft: ['confirmed', 'cancelled'],
   confirmed: ['in_production', 'cancelled'],
@@ -140,25 +130,21 @@ const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 
 function computeNextAllowed(order: OrderResponseDto): OrderStatus[] {
   const base = STATUS_TRANSITIONS[order.status] ?? []
-  // Sample‑approval gate: block confirmed → in_production when sample_approved is false
-  if (order.status === 'confirmed' && !order.sample_approved) {
+  if (order.status === 'confirmed' && !order.sampleApproved) {
     return base.filter((s) => s !== 'in_production')
   }
   return base
 }
 
-// ── Handlers ─────────────────────────────────────────────────────────────────
 export const ordersHandlers = [
-  // GET /orders — paginated list
   http.get(`${BASE}/orders`, ({ request }) => {
     const url = new URL(request.url)
     const page = parseInt(url.searchParams.get('page') ?? '1', 10)
     const limit = parseInt(url.searchParams.get('limit') ?? '20', 10)
     const status = url.searchParams.get('status')?.split(',')
-    const buyerId = url.searchParams.get('buyer_id')
-    const dateFrom = url.searchParams.get('delivery_date_from')
-    const dateTo = url.searchParams.get('delivery_date_to')
-    const search = url.searchParams.get('search')?.toLowerCase()
+    const buyerId = url.searchParams.get('buyerId')
+    const dateFrom = url.searchParams.get('deliveryDateFrom')
+    const dateTo = url.searchParams.get('deliveryDateTo')
 
     let filtered = [...orders]
 
@@ -166,21 +152,13 @@ export const ordersHandlers = [
       filtered = filtered.filter((o) => status.includes(o.status))
     }
     if (buyerId) {
-      filtered = filtered.filter((o) => o.buyer_id === buyerId)
+      filtered = filtered.filter((o) => o.buyerId === buyerId)
     }
     if (dateFrom) {
-      filtered = filtered.filter((o) => o.delivery_date >= dateFrom)
+      filtered = filtered.filter((o) => o.deliveryDate >= dateFrom)
     }
     if (dateTo) {
-      filtered = filtered.filter((o) => o.delivery_date <= dateTo)
-    }
-    if (search) {
-      filtered = filtered.filter(
-        (o) =>
-          o.order_number.toLowerCase().includes(search) ||
-          o.buyer.name.toLowerCase().includes(search) ||
-          o.article.article_code.toLowerCase().includes(search)
-      )
+      filtered = filtered.filter((o) => o.deliveryDate <= dateTo)
     }
 
     const total = filtered.length
@@ -188,7 +166,7 @@ export const ordersHandlers = [
     const paged = filtered.slice(start, start + limit).map((o) => ({
       ...o,
       nextAllowedStates: computeNextAllowed(o),
-      order_lines: undefined,
+      orderLines: undefined,
       milestones: undefined,
     }))
 
@@ -199,20 +177,23 @@ export const ordersHandlers = [
     return HttpResponse.json(resp)
   }),
 
-  // POST /orders — create
   http.post(`${BASE}/orders`, async ({ request }) => {
     const body = (await request.json()) as CreateOrderDto
     const now = new Date().toISOString()
     const order = makeOrder({
-      ...body,
+      buyerId: body.buyerId,
+      articleId: body.articleId,
+      currency: body.currency,
+      totalQuantity: body.totalQuantity,
+      deliveryDate: body.deliveryDate,
       status: 'draft',
-      order_lines:
-        body.order_lines?.map((l) => ({
+      orderLines:
+        body.orderLines?.map((l) => ({
           id: crypto.randomUUID(),
-          order_id: '',
-          size_label: l.size_label,
+          orderId: '',
+          sizeLabel: l.sizeLabel,
           quantity: l.quantity,
-          unit_price: l.unit_price ?? null,
+          unitPrice: l.unitPrice,
           createdAt: now,
         })) ?? [],
       createdAt: now,
@@ -225,7 +206,6 @@ export const ordersHandlers = [
     return HttpResponse.json(resp, { status: 201 })
   }),
 
-  // GET /orders/:id — detail
   http.get(`${BASE}/orders/:id`, ({ params }) => {
     const order = orders.find((o) => o.id === params.id)
     if (!order) {
@@ -240,7 +220,6 @@ export const ordersHandlers = [
     return HttpResponse.json(resp)
   }),
 
-  // PATCH /orders/:id — update (draft only)
   http.patch(`${BASE}/orders/:id`, async ({ params, request }) => {
     const order = orders.find((o) => o.id === params.id)
     if (!order) {
@@ -257,25 +236,12 @@ export const ordersHandlers = [
     }
     const body = (await request.json()) as UpdateOrderDto
     Object.assign(order, body, { updatedAt: new Date().toISOString() })
-    // Update order_lines if provided
-    if (body.order_lines) {
-      const now = new Date().toISOString()
-      order.order_lines = body.order_lines.map((l) => ({
-        id: crypto.randomUUID(),
-        order_id: order.id,
-        size_label: l.size_label,
-        quantity: l.quantity,
-        unit_price: l.unit_price ?? null,
-        createdAt: now,
-      }))
-    }
     const resp: ApiResponse<OrderResponseDto> = {
       data: { ...order, nextAllowedStates: computeNextAllowed(order) },
     }
     return HttpResponse.json(resp)
   }),
 
-  // PATCH /orders/:id/status — transition
   http.patch(`${BASE}/orders/:id/status`, async ({ params, request }) => {
     const order = orders.find((o) => o.id === params.id)
     if (!order) {
@@ -297,24 +263,22 @@ export const ordersHandlers = [
       )
     }
 
-    // Sample gate on confirmed → in_production
     if (
       order.status === 'confirmed' &&
       body.toStatus === 'in_production' &&
-      !order.sample_approved
+      !order.sampleApproved
     ) {
       return HttpResponse.json(
         {
           detail:
             'Sample approval is required before moving to production. Please approve the PP sample first.',
           status: 422,
-          errors: { sample_approved: ['Sample must be approved before production'] },
+          errors: { sampleApproved: ['Sample must be approved before production'] },
         },
         { status: 422 }
       )
     }
 
-    // Cancellation reason required
     if (body.toStatus === 'cancelled' && !body.cancellationReason) {
       return HttpResponse.json(
         {
@@ -329,17 +293,12 @@ export const ordersHandlers = [
     order.status = body.toStatus as OrderStatus
     order.updatedAt = new Date().toISOString()
 
-    if (body.toStatus === 'cancelled') {
-      order.remarks = body.cancellationReason ?? order.remarks
-    }
-
     const resp: ApiResponse<OrderResponseDto> = {
       data: { ...order, nextAllowedStates: computeNextAllowed(order) },
     }
     return HttpResponse.json(resp)
   }),
 
-  // GET /buyers — list with optional dropdown/search
   http.get(`${BASE}/buyers`, ({ request }) => {
     const url = new URL(request.url)
     const dropdown = url.searchParams.get('dropdown') === 'true'
@@ -347,18 +306,19 @@ export const ordersHandlers = [
     const page = parseInt(url.searchParams.get('page') ?? '1', 10)
     const limit = parseInt(url.searchParams.get('limit') ?? '50', 10)
 
-    let filtered = buyers.filter((b) => b.is_active)
+    let filtered = buyers.filter((b) => b.isActive !== false)
 
     if (search) {
       filtered = filtered.filter(
-        (b) => b.name.toLowerCase().includes(search) || b.buyer_code.toLowerCase().includes(search)
+        (b) =>
+          b.name.toLowerCase().includes(search) || (b.code?.toLowerCase().includes(search) ?? false)
       )
     }
 
     if (dropdown) {
       const dropdownData: BuyerDropdownDto[] = filtered.map((b) => ({
         id: b.id,
-        buyer_code: b.buyer_code,
+        code: b.code,
         name: b.name,
         country: b.country,
       }))
@@ -375,7 +335,6 @@ export const ordersHandlers = [
     })
   }),
 
-  // GET /buyers/:id
   http.get(`${BASE}/buyers/:id`, ({ params }) => {
     const buyer = buyers.find((b) => b.id === params.id)
     if (!buyer) {
@@ -384,7 +343,6 @@ export const ordersHandlers = [
     return HttpResponse.json({ data: buyer })
   }),
 
-  // POST /buyers
   http.post(`${BASE}/buyers`, async ({ request }) => {
     const body = (await request.json()) as CreateBuyerDto
     const buyer = makeBuyer(body)
@@ -392,7 +350,6 @@ export const ordersHandlers = [
     return HttpResponse.json({ data: buyer }, { status: 201 })
   }),
 
-  // PATCH /buyers/:id
   http.patch(`${BASE}/buyers/:id`, async ({ params, request }) => {
     const buyer = buyers.find((b) => b.id === params.id)
     if (!buyer) {
@@ -403,7 +360,16 @@ export const ordersHandlers = [
     return HttpResponse.json({ data: buyer })
   }),
 
-  // GET /articles — list
+  http.delete(`${BASE}/buyers/:id`, ({ params }) => {
+    const buyer = buyers.find((b) => b.id === params.id)
+    if (!buyer) {
+      return HttpResponse.json({ detail: 'Buyer not found', status: 404 }, { status: 404 })
+    }
+    buyer.isActive = false
+    buyer.updatedAt = new Date().toISOString()
+    return HttpResponse.json({ data: buyer })
+  }),
+
   http.get(`${BASE}/articles`, ({ request }) => {
     const url = new URL(request.url)
     const search = url.searchParams.get('search')?.toLowerCase()
@@ -412,13 +378,11 @@ export const ordersHandlers = [
     const page = parseInt(url.searchParams.get('page') ?? '1', 10)
     const limit = parseInt(url.searchParams.get('limit') ?? '50', 10)
 
-    let filtered = articles.filter((a) => a.is_active)
+    let filtered = articles.filter((a) => a.isActive !== false)
 
     if (search) {
       filtered = filtered.filter(
-        (a) =>
-          a.description.toLowerCase().includes(search) ||
-          a.article_code.toLowerCase().includes(search)
+        (a) => a.description.toLowerCase().includes(search) || a.code.toLowerCase().includes(search)
       )
     }
     if (category) {
@@ -438,7 +402,6 @@ export const ordersHandlers = [
     })
   }),
 
-  // GET /articles/:id
   http.get(`${BASE}/articles/:id`, ({ params }) => {
     const article = articles.find((a) => a.id === params.id)
     if (!article) {
@@ -447,7 +410,6 @@ export const ordersHandlers = [
     return HttpResponse.json({ data: article })
   }),
 
-  // POST /articles
   http.post(`${BASE}/articles`, async ({ request }) => {
     const body = (await request.json()) as CreateArticleDto
     const article = makeArticle(body)
@@ -455,7 +417,6 @@ export const ordersHandlers = [
     return HttpResponse.json({ data: article }, { status: 201 })
   }),
 
-  // PATCH /articles/:id
   http.patch(`${BASE}/articles/:id`, async ({ params, request }) => {
     const article = articles.find((a) => a.id === params.id)
     if (!article) {
@@ -466,165 +427,188 @@ export const ordersHandlers = [
     return HttpResponse.json({ data: article })
   }),
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Sprint 4: Quotations, Samples, Complaints, CAPA
-  // ═══════════════════════════════════════════════════════════════════════════
+  http.delete(`${BASE}/articles/:id`, ({ params }) => {
+    const article = articles.find((a) => a.id === params.id)
+    if (!article) {
+      return HttpResponse.json({ detail: 'Article not found', status: 404 }, { status: 404 })
+    }
+    article.isActive = false
+    article.updatedAt = new Date().toISOString()
+    return HttpResponse.json({ data: article })
+  }),
 
-  // POST /orders/:orderId/quotations — create quotation
   http.post(`${BASE}/orders/:orderId/quotations`, async ({ params, request }) => {
     const body = (await request.json()) as CreateQuotationDto
     const orderId = params.orderId as string
     const quotation: QuotationDto = {
       id: crypto.randomUUID(),
-      quotation_number: `QT-${String(Date.now()).slice(-6)}`,
-      order_id: orderId,
-      buyer_id: orders.find((o) => o.id === orderId)?.buyer_id ?? '',
-      article_id: orders.find((o) => o.id === orderId)?.article_id ?? '',
+      quotationNumber: `QT-${String(Date.now()).slice(-6)}`,
+      orderId,
+      buyerId: orders.find((o) => o.id === orderId)?.buyerId,
+      articleId: orders.find((o) => o.id === orderId)?.articleId,
       version: 1,
       currency: body.currency,
-      total_cost: null,
-      margin_pct: null,
-      quoted_price: body.quoted_price,
-      win_probability: body.win_probability ?? null,
-      valid_until: new Date(Date.now() + 30 * 24 * 3600_000).toISOString().split('T')[0]!,
+      quotedPrice: body.quotedPrice,
+      winProbability: body.winProbability ?? null,
       status: 'draft',
-      sent_at: null,
-      outcome_reason: null,
-      notes: body.notes ?? null,
+      sentAt: null,
+      outcomeReason: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
+    quotations.push(quotation)
     return HttpResponse.json({ data: quotation }, { status: 201 })
   }),
 
-  // GET /orders/:orderId/quotations — list
-  http.get(`${BASE}/orders/:orderId/quotations`, () => {
-    return HttpResponse.json({ data: [] })
+  http.get(`${BASE}/orders/:orderId/quotations`, ({ params }) => {
+    const list = quotations.filter((q) => q.orderId === params.orderId)
+    return HttpResponse.json({ data: list })
   }),
 
-  // POST /orders/:orderId/quotations/:id/send
-  http.post(`${BASE}/orders/:orderId/quotations/:id/send`, () => {
-    return HttpResponse.json({ data: { status: 'sent' } })
+  http.post(`${BASE}/orders/:orderId/quotations/:id/send`, ({ params }) => {
+    const quotation = quotations.find((q) => q.id === params.id)
+    if (quotation) {
+      quotation.status = 'sent'
+      quotation.sentAt = new Date().toISOString()
+      quotation.updatedAt = new Date().toISOString()
+    }
+    return HttpResponse.json({ data: quotation ?? { status: 'sent' } })
   }),
 
-  // POST /orders/:orderId/quotations/:id/close — win/loss
-  http.post(`${BASE}/orders/:orderId/quotations/:id/close`, async ({ request }) => {
+  http.post(`${BASE}/orders/:orderId/quotations/:id/close`, async ({ params, request }) => {
     const body = (await request.json()) as { outcome: string; outcomeReason: string }
-    // Simulate 409 Conflict when trying to mark as won
     if (body.outcome === 'won') {
       return HttpResponse.json(
         { detail: 'Another quotation has already been marked as won for this order.' },
         { status: 409 }
       )
     }
-    return HttpResponse.json({ data: { status: 'lost' } })
+    const quotation = quotations.find((q) => q.id === params.id)
+    if (quotation) {
+      quotation.status = 'lost'
+      quotation.outcomeReason = body.outcomeReason
+      quotation.updatedAt = new Date().toISOString()
+    }
+    return HttpResponse.json({ data: quotation ?? { status: 'lost' } })
   }),
 
-  // POST /orders/:orderId/quotations/:id/bom-populate — stub 501
-  http.post(`${BASE}/orders/:orderId/quotations/:id/bom-populate`, () => {
+  http.post(`${BASE}/orders/:orderId/quotations/:id/populate-from-bom`, () => {
     return HttpResponse.json(
-      { detail: 'BOM cost auto-population is not yet available.' },
+      {
+        statusCode: 501,
+        message: 'Not Implemented',
+        detail:
+          'BOM cost auto-population is not yet available. This endpoint will be enabled once the Manufacturing/BOM module is complete.',
+      },
       { status: 501 }
     )
   }),
 
-  // POST /orders/:orderId/samples — create sample round
   http.post(`${BASE}/orders/:orderId/samples`, async ({ params, request }) => {
     const body = (await request.json()) as CreateSampleDto
     const orderId = params.orderId as string
+    const existingForOrder = samples.filter((s) => s.orderId === orderId)
+    const nextRound =
+      body.roundNumber ??
+      (existingForOrder.length > 0
+        ? Math.max(...existingForOrder.map((s) => s.roundNumber ?? 0)) + 1
+        : 1)
     const sample: SampleDto = {
       id: crypto.randomUUID(),
-      order_id: orderId,
-      round_number: 1,
-      sample_type: body.sample_type,
-      dispatch_date: body.dispatch_date ?? null,
-      received_date: null,
-      courier: null,
-      tracking_no: null,
-      approval_status: 'pending',
-      buyer_comment: null,
-      remarks: null,
+      orderId,
+      roundNumber: nextRound,
+      sampleType: body.sampleType,
+      dispatchDate: body.dispatchDate ?? null,
+      receivedDate: body.receivedDate ?? null,
+      approvalStatus: 'pending',
+      remarks: body.remarks ?? null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
+    samples.push(sample)
     return HttpResponse.json({ data: sample }, { status: 201 })
   }),
 
-  // GET /orders/:orderId/samples — list
-  http.get(`${BASE}/orders/:orderId/samples`, () => {
-    return HttpResponse.json({ data: [] })
+  http.get(`${BASE}/orders/:orderId/samples`, ({ params }) => {
+    const list = samples.filter((s) => s.orderId === params.orderId)
+    return HttpResponse.json({ data: list })
   }),
 
-  // POST /orders/:orderId/samples/:id/approve
   http.post(`${BASE}/orders/:orderId/samples/:id/approve`, ({ params }) => {
-    // Update the order's sample_approved flag
     const order = orders.find((o) => o.id === params.orderId)
-    if (order) order.sample_approved = true
-    return HttpResponse.json({ data: { approval_status: 'approved' } })
+    if (order) order.sampleApproved = true
+    const sample = samples.find((s) => s.id === params.id)
+    if (sample) {
+      sample.approvalStatus = 'approved'
+      sample.updatedAt = new Date().toISOString()
+    }
+    return HttpResponse.json({ data: sample ?? { approvalStatus: 'approved' } })
   }),
 
-  // POST /orders/:orderId/samples/:id/reject
-  http.post(`${BASE}/orders/:orderId/samples/:id/reject`, () => {
-    return HttpResponse.json({ data: { approval_status: 'rejected' } })
+  http.post(`${BASE}/orders/:orderId/samples/:id/reject`, async ({ params, request }) => {
+    const body = (await request.json()) as { remarks: string }
+    if (!body.remarks) {
+      return HttpResponse.json({ detail: 'remarks is required', status: 422 }, { status: 422 })
+    }
+    const sample = samples.find((s) => s.id === params.id)
+    if (sample) {
+      sample.approvalStatus = 'rejected'
+      sample.remarks = body.remarks
+      sample.updatedAt = new Date().toISOString()
+    }
+    return HttpResponse.json({
+      data: sample ?? { approvalStatus: 'rejected', remarks: body.remarks },
+    })
   }),
 
-  // POST /orders/:orderId/complaints
   http.post(`${BASE}/orders/:orderId/complaints`, async ({ params, request }) => {
     const body = (await request.json()) as CreateComplaintDto
     const orderId = params.orderId as string
     const complaint: ComplaintDto = {
       id: crypto.randomUUID(),
-      complaint_no: `CMP-${String(Date.now()).slice(-6)}`,
-      order_id: orderId,
-      complaint_date: new Date().toISOString().split('T')[0]!,
+      complaintNo: `CMP-${String(Date.now()).slice(-6)}`,
+      orderId,
+      complaintDate: new Date().toISOString().split('T')[0]!,
       type: body.type,
       severity: body.severity,
       description: body.description,
       status: 'open',
-      root_cause: null,
-      quantity: null,
-      resolved_at: null,
+      rootCause: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
     return HttpResponse.json({ data: complaint }, { status: 201 })
   }),
 
-  // GET /orders/:orderId/complaints — list
   http.get(`${BASE}/orders/:orderId/complaints`, () => {
     return HttpResponse.json({ data: [] })
   }),
 
-  // PATCH /orders/:orderId/complaints/:id/root-cause
   http.patch(`${BASE}/orders/:orderId/complaints/:id/root-cause`, async ({ request }) => {
-    const body = (await request.json()) as { root_cause: string }
-    return HttpResponse.json({ data: { root_cause: body.root_cause } })
+    const body = (await request.json()) as { rootCause: string }
+    return HttpResponse.json({ data: { rootCause: body.rootCause } })
   }),
 
-  // POST /orders/:orderId/complaints/:complaintId/capa
   http.post(`${BASE}/orders/:orderId/complaints/:complaintId/capa`, async ({ params, request }) => {
     const body = (await request.json()) as CreateCapaDto
     const complaintId = params.complaintId as string
     const capa: CapaActionDto = {
       id: crypto.randomUUID(),
-      complaint_id: complaintId,
-      action_type: 'corrective',
+      complaintId,
       description: body.description,
-      owner_user_id: body.owner_user_id,
-      due_date: body.due_date,
+      ownerId: body.ownerId,
+      dueDate: body.dueDate,
       status: 'open',
-      closed_at: null,
+      closedAt: null,
       createdAt: new Date().toISOString(),
     }
     return HttpResponse.json({ data: capa }, { status: 201 })
   }),
 
-  // GET /orders/:orderId/complaints/:complaintId/capa
   http.get(`${BASE}/orders/:orderId/complaints/:complaintId/capa`, () => {
     return HttpResponse.json({ data: [] })
   }),
 
-  // PATCH /orders/:orderId/complaints/:complaintId/capa/:capaId/status
   http.patch(
     `${BASE}/orders/:orderId/complaints/:complaintId/capa/:capaId/status`,
     async ({ request }) => {

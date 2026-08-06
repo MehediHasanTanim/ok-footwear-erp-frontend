@@ -1,4 +1,5 @@
-import { Plus, Loader2, Clock, ChevronDown, ChevronRight } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Plus, Loader2, Clock, ChevronDown, ChevronRight, Search } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -13,7 +14,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { useDebounce } from '@/hooks/useDebounce'
+import { unwrapPaginatedList } from '@/hooks/useOrders'
 import { useComplaints } from '@/hooks/useOrderTabs'
+import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 import {
   COMPLAINT_TYPES,
@@ -22,37 +26,59 @@ import {
   CAPA_STATUS_META,
   CAPA_STATUSES,
 } from '@/types/orders'
-import type { CapaActionDto, CapaStatus } from '@/types/orders'
+import type { CapaActionDto, CapaStatus, ComplaintSeverity, ComplaintType } from '@/types/orders'
 
 interface Props {
   orderId: string
 }
 
+interface UserSuggestion {
+  id: string
+  email: string
+  fullName?: string
+  full_name?: string
+  firstName?: string
+  lastName?: string
+}
+
+function userDisplayName(u: UserSuggestion): string {
+  return u.fullName || u.full_name || [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email
+}
+
 export function ComplaintsTab({ orderId }: Props) {
   const { t } = useTranslation()
-  const { list, create, updateRootCause, capaCreate, capaUpdateStatus } = useComplaints(orderId)
+  const { list, create, updateRootCause, capaCreate, capaUpdateStatus, capaList } =
+    useComplaints(orderId)
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [complaintType, setComplaintType] = useState<string>('quality_defect')
-  const [severity, setSeverity] = useState<string>('medium')
+  const [complaintType, setComplaintType] = useState<ComplaintType>('quality')
+  const [severity, setSeverity] = useState<ComplaintSeverity>('medium')
   const [description, setDescription] = useState('')
   const [escalatedBanner, setEscalatedBanner] = useState(false)
 
-  // CAPA inline form
   const [capaFormComplaintId, setCapaFormComplaintId] = useState<string | null>(null)
   const [capaDesc, setCapaDesc] = useState('')
-  const [capaOwner, setCapaOwner] = useState('')
+  const [capaOwnerId, setCapaOwnerId] = useState('')
+  const [capaOwnerName, setCapaOwnerName] = useState('')
   const [capaDueDate, setCapaDueDate] = useState('')
 
   const complaints = list.data ?? []
   const openCount = complaints.filter((c) => c.status !== 'resolved').length
 
+  const resetCapaForm = () => {
+    setCapaFormComplaintId(null)
+    setCapaDesc('')
+    setCapaOwnerId('')
+    setCapaOwnerName('')
+    setCapaDueDate('')
+  }
+
   const handleCreate = () => {
     create.mutate(
       {
-        type: complaintType as never,
-        severity: severity as never,
+        type: complaintType,
+        severity,
         description,
       },
       {
@@ -73,16 +99,13 @@ export function ComplaintsTab({ orderId }: Props) {
         complaintId,
         dto: {
           description: capaDesc,
-          owner_user_id: capaOwner,
-          due_date: capaDueDate,
+          ownerId: capaOwnerId,
+          dueDate: capaDueDate,
         },
       },
       {
         onSuccess: () => {
-          setCapaFormComplaintId(null)
-          setCapaDesc('')
-          setCapaOwner('')
-          setCapaDueDate('')
+          resetCapaForm()
         },
       }
     )
@@ -131,7 +154,7 @@ export function ComplaintsTab({ orderId }: Props) {
                   ) : (
                     <ChevronRight className="h-4 w-4" />
                   )}
-                  <span className="font-medium text-sm">{c.complaint_no}</span>
+                  <span className="font-medium text-sm">{c.complaintNo ?? c.id.slice(0, 8)}</span>
                   <Badge variant="outline" className="text-xs">
                     {t(`complaints.type.${c.type}`)}
                   </Badge>
@@ -148,37 +171,45 @@ export function ComplaintsTab({ orderId }: Props) {
                   <Badge variant={meta.badgeVariant} className={cn('text-xs', meta.badgeClass)}>
                     {t(meta.labelKey)}
                   </Badge>
-                  <span className="ml-auto text-xs text-muted-foreground">{c.complaint_date}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{c.complaintDate}</span>
                 </button>
                 {isExpanded && (
                   <div className="border-t px-4 py-3 space-y-3">
                     <p className="text-sm">{c.description}</p>
-                    {c.root_cause ? (
+                    {c.rootCause ? (
                       <p className="text-sm text-muted-foreground">
-                        <strong>{t('complaints.rootCause')}:</strong> {c.root_cause}
+                        <strong>{t('complaints.rootCause')}:</strong> {c.rootCause}
                       </p>
                     ) : c.status !== 'resolved' ? (
                       <RootCauseEditor
                         complaintId={c.id}
-                        onSave={(rc) => updateRootCause.mutate({ id: c.id, root_cause: rc })}
+                        onSave={(rc) => updateRootCause.mutate({ id: c.id, rootCause: rc })}
                       />
                     ) : null}
 
-                    {/* CAPA section */}
                     <CapaSection
                       complaintId={c.id}
+                      capaList={capaList}
                       onStatusChange={(capaId, status) =>
                         capaUpdateStatus.mutate({ complaintId: c.id, capaId, dto: { status } })
                       }
                       capaFormOpen={capaFormComplaintId === c.id}
                       capaDesc={capaDesc}
-                      capaOwner={capaOwner}
+                      capaOwnerId={capaOwnerId}
+                      capaOwnerName={capaOwnerName}
                       capaDueDate={capaDueDate}
                       onCapaDescChange={setCapaDesc}
-                      onCapaOwnerChange={setCapaOwner}
+                      onCapaOwnerSelect={(id, name) => {
+                        setCapaOwnerId(id)
+                        setCapaOwnerName(name)
+                      }}
+                      onCapaOwnerClear={() => {
+                        setCapaOwnerId('')
+                        setCapaOwnerName('')
+                      }}
                       onCapaDueDateChange={setCapaDueDate}
                       onOpenCapaForm={() => setCapaFormComplaintId(c.id)}
-                      onCloseCapaForm={() => setCapaFormComplaintId(null)}
+                      onCloseCapaForm={resetCapaForm}
                       onSubmitCapa={() => handleCapaCreate(c.id)}
                       isSubmitting={capaCreate.isPending}
                       t={t}
@@ -191,7 +222,6 @@ export function ComplaintsTab({ orderId }: Props) {
         </div>
       )}
 
-      {/* Raise complaint drawer */}
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
         <SheetContent side="right" className="w-full sm:max-w-md">
           <SheetHeader>
@@ -200,11 +230,11 @@ export function ComplaintsTab({ orderId }: Props) {
           </SheetHeader>
           <div className="mt-6 space-y-4">
             <div className="space-y-2">
-              <Label>{t('complaints.type')}</Label>
+              <Label>{t('complaints.typeLabel')}</Label>
               <select
                 className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                 value={complaintType}
-                onChange={(e) => setComplaintType(e.target.value)}
+                onChange={(e) => setComplaintType(e.target.value as ComplaintType)}
               >
                 {COMPLAINT_TYPES.map((ct) => (
                   <option key={ct} value={ct}>
@@ -214,7 +244,7 @@ export function ComplaintsTab({ orderId }: Props) {
               </select>
             </div>
             <div className="space-y-2">
-              <Label>{t('complaints.severity')}</Label>
+              <Label>{t('complaints.severityLabel')}</Label>
               <div className="flex gap-4">
                 {COMPLAINT_SEVERITIES.map((s) => (
                   <label key={s} className="flex items-center gap-1 text-sm">
@@ -253,7 +283,6 @@ export function ComplaintsTab({ orderId }: Props) {
   )
 }
 
-// ── Root Cause Editor ────────────────────────────────────────────────────────
 function RootCauseEditor({
   complaintId: _complaintId,
   onSave,
@@ -304,16 +333,106 @@ function RootCauseEditor({
   )
 }
 
-// ── CAPA Section ─────────────────────────────────────────────────────────────
+function CapaOwnerPicker({
+  ownerId,
+  ownerName,
+  onSelect,
+  onClear,
+  t,
+}: {
+  ownerId: string
+  ownerName: string
+  onSelect: (id: string, name: string) => void
+  onClear: () => void
+  t: ReturnType<typeof useTranslation>['t']
+}) {
+  const [userSearch, setUserSearch] = useState('')
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const debouncedSearch = useDebounce(userSearch, 300)
+
+  const { data: suggestions = [] } = useQuery({
+    queryKey: ['users', 'search', 'capa-owner', debouncedSearch],
+    queryFn: async () => {
+      if (!debouncedSearch.trim()) return [] as UserSuggestion[]
+      // Backend may return { data: User[] } or nested { data: { data: User[], meta } }
+      const { data: body } = await api.get('/users', {
+        params: { search: debouncedSearch, limit: 5 },
+      })
+      return unwrapPaginatedList<UserSuggestion>(body).data
+    },
+    enabled: debouncedSearch.trim().length > 0,
+  })
+
+  const suggestionList = Array.isArray(suggestions) ? suggestions : []
+
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-1">
+        <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <Input
+          value={ownerName || userSearch}
+          onChange={(e) => {
+            setUserSearch(e.target.value)
+            onClear()
+            if (e.target.value) setDropdownOpen(true)
+          }}
+          onFocus={() => {
+            if (suggestionList.length > 0) setDropdownOpen(true)
+          }}
+          placeholder={t('capa.ownerSearch')}
+          className="h-8 text-sm"
+          autoComplete="off"
+          data-testid="capa-owner-search"
+        />
+      </div>
+      {ownerId && ownerName && (
+        <p className="mt-1 text-xs text-muted-foreground" data-testid="capa-owner-selected">
+          {ownerName}
+        </p>
+      )}
+      <div
+        className={cn(
+          'absolute z-20 mt-1 w-full rounded-md border bg-popover shadow-md',
+          dropdownOpen && suggestionList.length > 0 ? '' : 'hidden'
+        )}
+      >
+        {suggestionList.map((u) => {
+          const name = userDisplayName(u)
+          return (
+            <button
+              key={u.id}
+              type="button"
+              className="block w-full cursor-pointer px-3 py-1.5 text-left text-xs hover:bg-muted"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                onSelect(u.id, name)
+                setUserSearch('')
+                setDropdownOpen(false)
+              }}
+              data-testid={`capa-owner-opt-${u.id}`}
+            >
+              <div className="font-medium">{name}</div>
+              <div className="text-muted-foreground">{u.email}</div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function CapaSection({
   complaintId,
+  capaList,
   onStatusChange,
   capaFormOpen,
   capaDesc,
-  capaOwner,
+  capaOwnerId,
+  capaOwnerName,
   capaDueDate,
   onCapaDescChange,
-  onCapaOwnerChange,
+  onCapaOwnerSelect,
+  onCapaOwnerClear,
   onCapaDueDateChange,
   onOpenCapaForm,
   onCloseCapaForm,
@@ -322,13 +441,16 @@ function CapaSection({
   t,
 }: {
   complaintId: string
+  capaList: (complaintId: string) => { data?: CapaActionDto[] }
   onStatusChange: (capaId: string, status: CapaStatus) => void
   capaFormOpen: boolean
   capaDesc: string
-  capaOwner: string
+  capaOwnerId: string
+  capaOwnerName: string
   capaDueDate: string
   onCapaDescChange: (v: string) => void
-  onCapaOwnerChange: (v: string) => void
+  onCapaOwnerSelect: (id: string, name: string) => void
+  onCapaOwnerClear: () => void
   onCapaDueDateChange: (v: string) => void
   onOpenCapaForm: () => void
   onCloseCapaForm: () => void
@@ -336,8 +458,7 @@ function CapaSection({
   isSubmitting: boolean
   t: ReturnType<typeof useTranslation>['t']
 }) {
-  const { capaList: capaQuery } = useComplaints(complaintId)
-  const capas = capaQuery(complaintId).data ?? []
+  const capas = capaList(complaintId).data ?? []
 
   return (
     <div className="space-y-2">
@@ -350,7 +471,7 @@ function CapaSection({
 
       {capas.map((capa: CapaActionDto) => {
         const meta = CAPA_STATUS_META[capa.status]
-        const isOverdue = new Date(capa.due_date) < new Date() && capa.status !== 'done'
+        const isOverdue = new Date(capa.dueDate) < new Date() && capa.status !== 'done'
         return (
           <div
             key={capa.id}
@@ -359,11 +480,11 @@ function CapaSection({
             <div className="flex-1">
               <p>{capa.description}</p>
               <p className="text-muted-foreground">
-                {t('capa.owner')}: {capa.owner_name ?? capa.owner_user_id.slice(0, 8)}
+                {t('capa.owner')}: {capa.ownerName ?? capa.ownerId.slice(0, 8)}
                 {' · '}
                 {t('capa.due')}:{' '}
                 <span className={cn(isOverdue && 'text-red-600 font-medium')}>
-                  {capa.due_date}
+                  {capa.dueDate}
                   {isOverdue && <Clock className="ml-1 inline h-3 w-3 text-red-500" />}
                 </span>
               </p>
@@ -398,11 +519,12 @@ function CapaSection({
             value={capaDesc}
             onChange={(e) => onCapaDescChange(e.target.value)}
           />
-          <Input
-            placeholder={t('capa.ownerId')}
-            value={capaOwner}
-            onChange={(e) => onCapaOwnerChange(e.target.value)}
-            className="h-8 text-sm"
+          <CapaOwnerPicker
+            ownerId={capaOwnerId}
+            ownerName={capaOwnerName}
+            onSelect={onCapaOwnerSelect}
+            onClear={onCapaOwnerClear}
+            t={t}
           />
           <Input
             type="date"
@@ -414,7 +536,7 @@ function CapaSection({
             <Button
               size="sm"
               onClick={onSubmitCapa}
-              disabled={isSubmitting || !capaDesc.trim() || !capaDueDate}
+              disabled={isSubmitting || !capaDesc.trim() || !capaOwnerId || !capaDueDate}
             >
               {isSubmitting && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
               {t('common.save')}

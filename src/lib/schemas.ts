@@ -1,66 +1,54 @@
 // ── Orders Module Zod Schemas ────────────────────────────────────────────────
-// Shared validation schemas used by both the create wizard and React Hook Form.
-// Define once, reuse everywhere — no ad-hoc per-step validation.
+// Field names match NestJS OpenAPI DTOs (camelCase).
 
 import { z } from 'zod'
 
-import { CURRENCY_CODES, ORDER_TYPES, SIZE_SYSTEMS } from '@/types/orders'
+import { CURRENCY_CODES, PAYMENT_TERMS, SIZE_SYSTEMS } from '@/types/orders'
+import { VENDOR_TYPES, VENDOR_STATUSES } from '@/types/procurement'
 
-// ── Order Line Item ──────────────────────────────────────────────────────────
 export const orderLineSchema = z.object({
-  size_label: z.string().min(1, 'Size label is required'),
+  sizeLabel: z.string().min(1, 'Size label is required'),
   quantity: z.number().int().positive('Quantity must be a positive integer'),
-  unit_price: z.number().positive('Unit price must be positive').nullable().optional(),
+  unitPrice: z.number().positive('Unit price must be greater than 0'),
 })
 
-// ── Create Order ─────────────────────────────────────────────────────────────
 export const createOrderSchema = z
   .object({
-    buyer_id: z.string().uuid('Please select a buyer'),
-    article_id: z.string().uuid('Please select an article'),
-    order_type: z.enum(ORDER_TYPES, { message: 'Invalid order type' }),
-    season: z.string().optional(),
+    buyerId: z.string().min(1, 'Please select a buyer'),
+    articleId: z.string().min(1, 'Please select an article'),
     currency: z
       .string()
       .length(3, 'Currency must be a 3-letter ISO 4217 code')
       .refine((val) => (CURRENCY_CODES as readonly string[]).includes(val), {
         message: 'Invalid ISO 4217 currency code',
       }),
-    unit_price: z.number().positive('Unit price must be greater than 0'),
-    total_quantity: z.number().int().positive('Total quantity must be a positive integer'),
-    delivery_date: z.string().refine(
+    /** UI-only: applied to every order line as unitPrice on submit */
+    unitPrice: z.number().positive('Unit price must be greater than 0'),
+    totalQuantity: z.number().int().positive('Total quantity must be a positive integer'),
+    deliveryDate: z.string().refine(
       (val) => {
         const date = new Date(val)
         return !isNaN(date.getTime()) && date > new Date()
       },
       { message: 'Delivery date must be in the future' }
     ),
-    pi_number: z.string().optional(),
-    lc_number: z.string().optional(),
-    remarks: z.string().optional(),
-    order_lines: z.array(orderLineSchema).min(1, 'At least one size line is required'),
+    orderLines: z.array(orderLineSchema).min(1, 'At least one size line is required'),
   })
   .refine(
     (data) => {
-      const lineTotal = data.order_lines.reduce((sum, line) => sum + line.quantity, 0)
-      return lineTotal === data.total_quantity
+      const lineTotal = data.orderLines.reduce((sum, line) => sum + line.quantity, 0)
+      return lineTotal === data.totalQuantity
     },
     {
       message: 'Line quantities must sum to the total quantity',
-      path: ['order_lines'],
+      path: ['orderLines'],
     }
   )
 
 export type CreateOrderFormData = z.infer<typeof createOrderSchema>
 
-// ── Update Order (draft-only) ────────────────────────────────────────────────
-// Zod v4: .partial() doesn't work on schemas with .refine().
-// Build a separate base schema without refinements for the update case.
 const updateOrderBase = z.object({
-  buyer_id: z.string().uuid('Please select a buyer').optional(),
-  article_id: z.string().uuid('Please select an article').optional(),
-  order_type: z.enum(ORDER_TYPES, { message: 'Invalid order type' }).optional(),
-  season: z.string().optional(),
+  articleId: z.string().min(1, 'Please select an article').optional(),
   currency: z
     .string()
     .length(3, 'Currency must be a 3-letter ISO 4217 code')
@@ -68,9 +56,9 @@ const updateOrderBase = z.object({
       message: 'Invalid ISO 4217 currency code',
     })
     .optional(),
-  unit_price: z.number().positive('Unit price must be greater than 0').optional(),
-  total_quantity: z.number().int().positive('Total quantity must be a positive integer').optional(),
-  delivery_date: z
+  unitPrice: z.number().positive('Unit price must be greater than 0').optional(),
+  totalQuantity: z.number().int().positive('Total quantity must be a positive integer').optional(),
+  deliveryDate: z
     .string()
     .refine(
       (val) => {
@@ -80,27 +68,24 @@ const updateOrderBase = z.object({
       { message: 'Delivery date must be in the future' }
     )
     .optional(),
-  pi_number: z.string().optional(),
-  lc_number: z.string().optional(),
-  remarks: z.string().optional(),
-  order_lines: z.array(orderLineSchema).optional(),
+  sampleApproved: z.boolean().optional(),
+  orderLines: z.array(orderLineSchema).optional(),
 })
 
 export const updateOrderSchema = updateOrderBase.refine(
   (data) => {
-    if (!data.order_lines || !data.total_quantity) return true
-    const lineTotal = data.order_lines.reduce((sum, line) => sum + line.quantity, 0)
-    return lineTotal === data.total_quantity
+    if (!data.orderLines || !data.totalQuantity) return true
+    const lineTotal = data.orderLines.reduce((sum, line) => sum + line.quantity, 0)
+    return lineTotal === data.totalQuantity
   },
   {
     message: 'Line quantities must sum to the total quantity',
-    path: ['order_lines'],
+    path: ['orderLines'],
   }
 )
 
 export type UpdateOrderFormData = z.infer<typeof updateOrderSchema>
 
-// ── Status Transition ────────────────────────────────────────────────────────
 export const transitionStatusSchema = z.object({
   toStatus: z.string().min(1, 'Target status is required'),
   cancellationReason: z.string().optional(),
@@ -108,39 +93,85 @@ export const transitionStatusSchema = z.object({
 
 export type TransitionStatusFormData = z.infer<typeof transitionStatusSchema>
 
-// ── Buyer ────────────────────────────────────────────────────────────────────
 export const createBuyerSchema = z.object({
-  buyer_code: z.string().min(1, 'Buyer code is required'),
   name: z.string().min(1, 'Buyer name is required'),
-  contact_name: z.string().optional(),
-  email: z.string().email('Invalid email').optional().or(z.literal('')),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  country: z.string().min(1, 'Country is required'),
-  payment_terms: z.number().int().min(0, 'Payment terms must be non-negative'),
-  credit_limit: z.number().min(0, 'Credit limit must be non-negative'),
   currency: z
     .string()
     .length(3, 'Currency must be a 3-letter ISO 4217 code')
     .refine((val) => (CURRENCY_CODES as readonly string[]).includes(val), {
       message: 'Invalid ISO 4217 currency code',
     }),
-  notes: z.string().optional(),
+  paymentTerms: z.enum(PAYMENT_TERMS, { message: 'Invalid payment terms' }),
+  creditLimit: z.number().min(0, 'Credit limit must be non-negative').optional(),
+  country: z.string().optional(),
 })
 
 export type CreateBuyerFormData = z.infer<typeof createBuyerSchema>
 
-// ── Article ──────────────────────────────────────────────────────────────────
 export const createArticleSchema = z.object({
-  article_code: z.string().min(1, 'Article code is required'),
+  code: z.string().min(1, 'Article code is required'),
   description: z.string().min(1, 'Description is required'),
-  category: z.string().min(1, 'Category is required'),
-  sub_category: z.string().optional(),
-  gender: z.string().optional(),
+  category: z.string().optional(),
   season: z.string().optional(),
-  size_system: z.string().refine((val) => (SIZE_SYSTEMS as readonly string[]).includes(val), {
-    message: 'Invalid size system',
-  }),
+  sizeSystem: z
+    .string()
+    .optional()
+    .refine((val) => !val || (SIZE_SYSTEMS as readonly string[]).includes(val), {
+      message: 'Invalid size system',
+    }),
 })
 
 export type CreateArticleFormData = z.infer<typeof createArticleSchema>
+
+// ── Procurement schemas ──────────────────────────────────────────────────────
+export const createVendorSchema = z.object({
+  vendorCode: z.string().min(1, 'Vendor code is required'),
+  name: z.string().min(1, 'Vendor name is required'),
+  type: z.enum(VENDOR_TYPES, { message: 'Invalid vendor type' }),
+  categoryId: z.string().min(1, 'Category is required'),
+  contactName: z.string().min(1, 'Contact name is required'),
+  email: z.string().email('Valid email is required'),
+  phone: z.string().min(1, 'Phone is required'),
+  address: z.string().min(1, 'Address is required'),
+  tradeLicense: z.string().min(1, 'Trade licence is required'),
+  tinNumber: z.string().min(1, 'TIN is required'),
+  bankName: z.string().min(1, 'Bank name is required'),
+  bankAccount: z.string().min(1, 'Bank account is required'),
+  paymentTerms: z.number().int().min(0, 'Payment terms must be ≥ 0'),
+  creditLimit: z.number().min(0, 'Credit limit must be ≥ 0'),
+  status: z.enum(VENDOR_STATUSES, { message: 'Status is required' }),
+  notes: z.string().optional(),
+})
+export type CreateVendorFormData = z.infer<typeof createVendorSchema>
+export const vendorFormSchema = createVendorSchema
+export type VendorFormData = CreateVendorFormData
+
+export const createPoLineSchema = z.object({
+  itemId: z.string().min(1, 'Item is required'),
+  itemCode: z.string().optional(),
+  itemName: z.string().optional(),
+  orderedQty: z.number().positive('Quantity must be positive'),
+  unitPrice: z.number().min(0, 'Unit price must be non-negative'),
+  uom: z.string().min(1, 'UOM is required'),
+  deliveryDate: z.string().optional(),
+})
+
+export const createPoSchema = z.object({
+  vendorId: z.string().min(1, 'Please select a vendor'),
+  currency: z.string().length(3),
+  deliveryDate: z.string().min(1, 'Delivery date is required'),
+  notes: z.string().optional(),
+  lines: z.array(createPoLineSchema).min(1, 'Add at least one line'),
+})
+export type CreatePoFormData = z.infer<typeof createPoSchema>
+
+export const createVendorInvoiceSchema = z.object({
+  vendorId: z.string().min(1),
+  grnId: z.string().min(1),
+  invoiceNo: z.string().min(1),
+  invoiceDate: z.string().min(1),
+  dueDate: z.string().min(1),
+  currency: z.string().length(3).optional(),
+  grossAmount: z.number().positive(),
+})
+export type CreateVendorInvoiceFormData = z.infer<typeof createVendorInvoiceSchema>

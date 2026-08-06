@@ -1,6 +1,5 @@
 // ── Orders Module Types ──────────────────────────────────────────────────────
-// Mirrors the NestJS backend API contracts (Sprint 3).
-// See: docs/design/OK_Footwear_ERP_Schema_Reference.md
+// Aligned to NestJS OpenAPI at /api/docs-json (camelCase request/response DTOs).
 
 import type { ISODate, ISODateTime, UUID } from './index'
 
@@ -18,29 +17,16 @@ export const ORDER_STATUSES = [
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number]
 
-export const ORDER_TYPES = ['bulk', 'sample', 'repeat', 'trial'] as const
-export type OrderType = (typeof ORDER_TYPES)[number]
-
-export const MILESTONE_TYPES = [
-  'material_booking',
-  'pp_sample',
-  'bulk_start',
-  'qc',
-  'packing',
-  'shipment',
-] as const
-export type MilestoneType = (typeof MILESTONE_TYPES)[number]
-
-export const MILESTONE_STATUSES = ['pending', 'done', 'overdue'] as const
-export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number]
-
 export const SIZE_SYSTEMS = ['EU', 'UK', 'US'] as const
 export type SizeSystem = (typeof SIZE_SYSTEMS)[number]
 
+/** UI presets for article category (API accepts free string). */
 export const ARTICLE_CATEGORIES = ['men', 'women', 'kids', 'safety', 'sports'] as const
 export type ArticleCategory = (typeof ARTICLE_CATEGORIES)[number]
 
-// ── ISO 4217 Currency Codes (subset used by OK Footwear) ─────────────────────
+export const PAYMENT_TERMS = ['LC_SIGHT', 'LC_USANCE', 'TT_ADVANCE', 'TT_30_DAYS'] as const
+export type PaymentTerms = (typeof PAYMENT_TERMS)[number]
+
 export const CURRENCY_CODES = [
   'USD',
   'EUR',
@@ -55,23 +41,31 @@ export const CURRENCY_CODES = [
 ] as const
 export type CurrencyCode = (typeof CURRENCY_CODES)[number]
 
-// ── Size Run Lookup ──────────────────────────────────────────────────────────
-// TODO(Tanim): These are placeholder ranges. Replace with real size-run data
-// per size_system from the production database or reference data.
 export const SIZE_RUN_MAP: Record<SizeSystem, string[]> = {
   EU: ['36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'],
   UK: ['3', '3.5', '4', '4.5', '5', '5.5', '6', '6.5', '7', '8', '9', '10', '11'],
   US: ['4', '4.5', '5', '5.5', '6', '6.5', '7', '7.5', '8', '9', '10', '11', '12'],
 }
 
+export const MILESTONE_TYPES = [
+  'material_booking',
+  'pp_sample',
+  'bulk_start',
+  'qc',
+  'packing',
+  'shipment',
+] as const
+export type MilestoneType = (typeof MILESTONE_TYPES)[number]
+
+export const MILESTONE_STATUSES = ['pending', 'done', 'overdue'] as const
+export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number]
+
 // ── Order Status Meta ───────────────────────────────────────────────────────
-// Single source of truth for status labels, colours, and descriptions.
-// Reused by OrderStatusBadge, OrderStatusActions, and any reporting UI.
+
 export interface OrderStatusMeta {
-  labelKey: string // i18next translation key
-  descriptionKey: string // i18next translation key for tooltip
+  labelKey: string
+  descriptionKey: string
   badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline'
-  /** Tailwind classes appended to the badge variant */
   badgeClass: string
 }
 
@@ -120,88 +114,114 @@ export const ORDER_STATUS_META: Record<OrderStatus, OrderStatusMeta> = {
   },
 }
 
-// ── DTOs ─────────────────────────────────────────────────────────────────────
+// ── Buyers ───────────────────────────────────────────────────────────────────
 
 export interface BuyerDto {
   id: UUID
-  buyer_code: string
   name: string
-  contact_name?: string
-  email?: string
-  phone?: string
-  address?: string
-  country: string
-  payment_terms: number
-  credit_limit: number
   currency: CurrencyCode
-  is_active: boolean
-  notes?: string
-  createdAt: ISODateTime
-  updatedAt: ISODateTime
+  paymentTerms: PaymentTerms
+  creditLimit?: number
+  country?: string
+  isActive?: boolean
+  /** Present when backend exposes a buyer code */
+  code?: string
+  createdAt?: ISODateTime
+  updatedAt?: ISODateTime
 }
 
 export interface BuyerDropdownDto {
   id: UUID
-  buyer_code: string
   name: string
-  country: string
+  country?: string
+  code?: string
 }
+
+export interface CreateBuyerDto {
+  name: string
+  currency: CurrencyCode
+  paymentTerms: PaymentTerms
+  creditLimit?: number
+  country?: string
+}
+
+export interface UpdateBuyerDto {
+  name?: string
+  currency?: CurrencyCode
+  paymentTerms?: PaymentTerms
+  creditLimit?: number
+  country?: string
+  isActive?: boolean
+}
+
+// ── Articles ─────────────────────────────────────────────────────────────────
 
 export interface ArticleDto {
   id: UUID
-  article_code: string
+  code: string
   description: string
-  category: ArticleCategory
-  sub_category?: string
-  gender?: string
-  season?: string
-  size_system: SizeSystem
-  is_active: boolean
-  createdAt: ISODateTime
-  updatedAt: ISODateTime
+  sizeSystem?: SizeSystem
+  category?: string
+  season?: string | null
+  isActive?: boolean
+  createdAt?: ISODateTime
+  updatedAt?: ISODateTime
 }
 
+export interface CreateArticleDto {
+  code: string
+  description: string
+  sizeSystem?: SizeSystem
+  category?: string
+  season?: string
+}
+
+export interface UpdateArticleDto {
+  code?: string
+  description?: string
+  sizeSystem?: SizeSystem
+  category?: string
+  season?: string
+  isActive?: boolean
+}
+
+// ── Orders ───────────────────────────────────────────────────────────────────
+
 export interface OrderLineDto {
-  id: UUID
-  order_id: UUID
-  size_label: string
+  id?: UUID
+  orderId?: UUID
+  sizeLabel: string
   quantity: number
-  unit_price?: number | null
-  createdAt: ISODateTime
+  unitPrice: number
+  createdAt?: ISODateTime
 }
 
 export interface OrderMilestoneDto {
   id: UUID
-  order_id: UUID
-  milestone_type: MilestoneType
-  planned_date: ISODate
-  actual_date?: ISODate | null
+  orderId?: UUID
+  milestoneType: MilestoneType
+  plannedDate: ISODate
+  actualDate?: ISODate | null
   status: MilestoneStatus
 }
 
 export interface OrderResponseDto {
   id: UUID
-  order_number: string
-  buyer_id: UUID
-  buyer: Pick<BuyerDto, 'id' | 'buyer_code' | 'name' | 'currency'>
-  article_id: UUID
-  article: Pick<ArticleDto, 'id' | 'article_code' | 'description' | 'size_system'>
-  order_type: OrderType
-  season?: string
+  orderNumber: string
+  buyerId: UUID
+  buyer: Pick<BuyerDto, 'id' | 'name' | 'currency'> & { code?: string }
+  articleId: UUID
+  article: Pick<ArticleDto, 'id' | 'code' | 'description' | 'sizeSystem'>
   status: OrderStatus
   currency: CurrencyCode
-  unit_price: number
-  total_quantity: number
-  delivery_date: ISODate
-  pi_number?: string | null
-  lc_number?: string | null
-  sample_approved: boolean
-  remarks?: string | null
+  totalQuantity: number
+  deliveryDate: ISODate
+  sampleApproved: boolean
   nextAllowedStates: OrderStatus[]
-  order_lines?: OrderLineDto[]
+  orderLines?: OrderLineDto[]
   milestones?: OrderMilestoneDto[]
-  createdAt: ISODateTime
-  updatedAt: ISODateTime
+  createdAt?: ISODateTime
+  updatedAt?: ISODateTime
 }
 
 export interface OrderListResponseDto {
@@ -214,39 +234,24 @@ export interface OrderListResponseDto {
 }
 
 export interface CreateOrderDto {
-  buyer_id: UUID
-  article_id: UUID
-  order_type: OrderType
-  season?: string
+  buyerId: UUID
+  articleId: UUID
+  totalQuantity: number
+  deliveryDate: ISODate
   currency: CurrencyCode
-  unit_price: number
-  total_quantity: number
-  delivery_date: ISODate
-  pi_number?: string
-  lc_number?: string
-  remarks?: string
-  order_lines: Array<{
-    size_label: string
+  orderLines: Array<{
+    sizeLabel: string
     quantity: number
-    unit_price?: number | null
+    unitPrice: number
   }>
 }
 
 export interface UpdateOrderDto {
-  order_type?: OrderType
-  season?: string
+  articleId?: UUID
+  totalQuantity?: number
+  deliveryDate?: ISODate
   currency?: CurrencyCode
-  unit_price?: number
-  total_quantity?: number
-  delivery_date?: ISODate
-  pi_number?: string
-  lc_number?: string
-  remarks?: string
-  order_lines?: Array<{
-    size_label: string
-    quantity: number
-    unit_price?: number | null
-  }>
+  sampleApproved?: boolean
 }
 
 export interface TransitionStatusDto {
@@ -254,66 +259,15 @@ export interface TransitionStatusDto {
   cancellationReason?: string
 }
 
-export interface CreateBuyerDto {
-  buyer_code: string
-  name: string
-  contact_name?: string
-  email?: string
-  phone?: string
-  address?: string
-  country: string
-  payment_terms: number
-  credit_limit: number
-  currency: CurrencyCode
-  notes?: string
-}
-
-export interface UpdateBuyerDto {
-  buyer_code?: string
-  name?: string
-  contact_name?: string
-  email?: string
-  phone?: string
-  address?: string
-  country?: string
-  payment_terms?: number
-  credit_limit?: number
-  currency?: CurrencyCode
-  is_active?: boolean
-  notes?: string
-}
-
-export interface CreateArticleDto {
-  article_code: string
-  description: string
-  category: ArticleCategory
-  sub_category?: string
-  gender?: string
-  season?: string
-  size_system: SizeSystem
-}
-
-export interface UpdateArticleDto {
-  article_code?: string
-  description?: string
-  category?: ArticleCategory
-  sub_category?: string
-  gender?: string
-  season?: string
-  size_system?: SizeSystem
-  is_active?: boolean
-}
-
-// ── Filter DTOs ──────────────────────────────────────────────────────────────
+// ── Filters ──────────────────────────────────────────────────────────────────
 
 export interface OrdersFilter {
   status?: OrderStatus | OrderStatus[]
-  buyer_id?: UUID
-  delivery_date_from?: ISODate
-  delivery_date_to?: ISODate
+  buyerId?: UUID
+  deliveryDateFrom?: ISODate
+  deliveryDateTo?: ISODate
   page?: number
   limit?: number
-  search?: string
 }
 
 export interface BuyersFilter {
@@ -325,13 +279,13 @@ export interface BuyersFilter {
 
 export interface ArticlesFilter {
   search?: string
-  category?: ArticleCategory
+  category?: string
   season?: string
   page?: number
   limit?: number
 }
 
-// ── Sprint 4: Quotations ────────────────────────────────────────────────────
+// ── Quotations ───────────────────────────────────────────────────────────────
 
 export const QUOTATION_STATUSES = ['draft', 'sent', 'won', 'lost'] as const
 export type QuotationStatus = (typeof QUOTATION_STATUSES)[number]
@@ -365,45 +319,40 @@ export const QUOTATION_STATUS_META: Record<QuotationStatus, OrderStatusMeta> = {
 
 export interface QuotationDto {
   id: UUID
-  quotation_number: string
-  order_id: UUID
-  buyer_id: UUID
-  article_id: UUID
-  version: number
+  quotationNumber?: string
+  orderId: UUID
+  buyerId?: UUID
+  articleId?: UUID
+  version?: number
   currency: CurrencyCode
-  total_cost?: number | null
-  margin_pct?: number | null
-  quoted_price: number
-  win_probability?: number | null
-  valid_until: ISODate
+  quotedPrice?: number | null
+  winProbability?: number | null
   status: QuotationStatus
-  sent_at?: ISODateTime | null
-  outcome_reason?: string | null
-  notes?: string | null
-  createdAt: ISODateTime
-  updatedAt: ISODateTime
+  sentAt?: ISODateTime | null
+  outcomeReason?: string | null
+  createdAt?: ISODateTime
+  updatedAt?: ISODateTime
 }
 
 export interface CreateQuotationDto {
-  quoted_price: number
   currency: CurrencyCode
-  win_probability?: number
-  notes?: string
+  quotedPrice?: number
+  winProbability?: number
+  bomVersionId?: string
+}
+
+export interface PopulateFromBomDto {
+  bomVersionId?: string
 }
 
 export interface CloseQuotationDto {
   outcome: 'won' | 'lost'
-  outcomeReason: string
+  outcomeReason?: string
 }
 
-// ── Sprint 4: Samples ────────────────────────────────────────────────────────
+// ── Samples ──────────────────────────────────────────────────────────────────
 
-export const SAMPLE_TYPES = [
-  'pp_sample',
-  'counter_sample',
-  'size_set',
-  'top_of_production',
-] as const
+export const SAMPLE_TYPES = ['PP', 'counter', 'size_set', 'TOP'] as const
 export type SampleType = (typeof SAMPLE_TYPES)[number]
 
 export const SAMPLE_APPROVAL_STATUSES = ['pending', 'approved', 'rejected'] as const
@@ -432,33 +381,37 @@ export const SAMPLE_APPROVAL_STATUS_META: Record<SampleApprovalStatus, OrderStat
 
 export interface SampleDto {
   id: UUID
-  order_id: UUID
-  round_number: number
-  sample_type: SampleType
-  dispatch_date?: ISODate | null
-  received_date?: ISODate | null
-  courier?: string | null
-  tracking_no?: string | null
-  approval_status: SampleApprovalStatus
-  buyer_comment?: string | null
+  orderId: UUID
+  roundNumber?: number
+  sampleType: SampleType
+  dispatchDate?: ISODate | null
+  receivedDate?: ISODate | null
+  approvalStatus?: SampleApprovalStatus
   remarks?: string | null
-  createdAt: ISODateTime
-  updatedAt: ISODateTime
+  createdAt?: ISODateTime
+  updatedAt?: ISODateTime
 }
 
 export interface CreateSampleDto {
-  sample_type: SampleType
-  dispatch_date?: ISODate
+  sampleType: SampleType
+  roundNumber?: number
+  dispatchDate?: ISODate
+  receivedDate?: ISODate
+  remarks?: string
 }
 
-// ── Sprint 4: Complaints & CAPA ──────────────────────────────────────────────
+export interface RejectSampleDto {
+  remarks: string
+}
+
+// ── Complaints & CAPA ────────────────────────────────────────────────────────
 
 export const COMPLAINT_TYPES = [
-  'quality_defect',
-  'wrong_style',
-  'wrong_size',
-  'short_shipment',
+  'quality',
+  'delivery',
   'packaging',
+  'documentation',
+  'other',
 ] as const
 export type ComplaintType = (typeof COMPLAINT_TYPES)[number]
 
@@ -515,31 +468,28 @@ export const CAPA_STATUS_META: Record<CapaStatus, OrderStatusMeta> = {
 
 export interface ComplaintDto {
   id: UUID
-  complaint_no: string
-  order_id: UUID
-  complaint_date: ISODate
+  complaintNo?: string
+  orderId: UUID
+  complaintDate?: ISODate
   type: ComplaintType
   severity: ComplaintSeverity
   description: string
   status: ComplaintStatus
-  root_cause?: string | null
-  quantity?: number | null
-  resolved_at?: ISODateTime | null
-  createdAt: ISODateTime
-  updatedAt: ISODateTime
+  rootCause?: string | null
+  createdAt?: ISODateTime
+  updatedAt?: ISODateTime
 }
 
 export interface CapaActionDto {
   id: UUID
-  complaint_id: UUID
-  action_type: 'corrective' | 'preventive'
+  complaintId?: UUID
   description: string
-  owner_user_id: UUID
-  owner_name?: string
-  due_date: ISODate
+  ownerId: UUID
+  ownerName?: string
+  dueDate: ISODate
   status: CapaStatus
-  closed_at?: ISODateTime | null
-  createdAt: ISODateTime
+  closedAt?: ISODateTime | null
+  createdAt?: ISODateTime
 }
 
 export interface CreateComplaintDto {
@@ -550,10 +500,18 @@ export interface CreateComplaintDto {
 
 export interface CreateCapaDto {
   description: string
-  owner_user_id: UUID
-  due_date: ISODate
+  ownerId: UUID
+  dueDate: ISODate
+}
+
+export interface UpdateRootCauseDto {
+  rootCause: string
 }
 
 export interface UpdateCapaStatusDto {
   status: CapaStatus
 }
+
+/** @deprecated Kept for UI that still references order types locally */
+export const ORDER_TYPES = ['bulk', 'sample', 'repeat', 'trial'] as const
+export type OrderType = (typeof ORDER_TYPES)[number]

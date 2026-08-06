@@ -9,7 +9,10 @@ coverage
 .gitignore
 .husky
 .vscode
-.venv
+# Environment files (use Docker ARG instead)
+.env
+.env.local
+.env.*.local
 
 # Build artifacts
 *.log
